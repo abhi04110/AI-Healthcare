@@ -4,6 +4,8 @@ from sqlalchemy import text
 from app.database import engine, Base
 from app import models
 
+from app.routers import auth
+
 
 # =========================================================
 # CREATE DATABASE TABLES
@@ -23,6 +25,7 @@ app = FastAPI(
     description="""
     An intelligent healthcare system for:
 
+    - Authentication
     - Patient Management
     - Health Risk Prediction
     - Medical Report OCR
@@ -35,7 +38,16 @@ app = FastAPI(
 
 
 # =========================================================
-# HOME API
+# ROUTERS
+# =========================================================
+
+app.include_router(
+    auth.router
+)
+
+
+# =========================================================
+# HOME
 # =========================================================
 
 @app.get("/")
@@ -88,7 +100,7 @@ def database_check():
 
 
 # =========================================================
-# DATABASE TABLE CHECK
+# TABLE CHECK
 # =========================================================
 
 @app.get("/tables")
