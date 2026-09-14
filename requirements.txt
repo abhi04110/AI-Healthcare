@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+
+sqlalchemy
+psycopg2-binary
+
+pyjwt
+pwdlib[argon2]
+python-multipart
+email-validator
