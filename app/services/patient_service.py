@@ -1,0 +1,121 @@
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.models import Patient, User
+from app.schemas import PatientCreate, PatientUpdate
+
+
+def create_patient_service(
+    patient_data: PatientCreate,
+    current_user: User,
+    db: Session
+):
+    existing_patient = db.query(Patient).filter(
+        Patient.patient_code == patient_data.patient_code
+    ).first()
+
+    if existing_patient:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Patient code already exists"
+        )
+
+    patient = Patient(
+        patient_code=patient_data.patient_code,
+        name=patient_data.name,
+        age=patient_data.age,
+        gender=patient_data.gender,
+        phone=patient_data.phone,
+        address=patient_data.address,
+        medical_history=patient_data.medical_history,
+        created_by=current_user.id
+    )
+
+    db.add(patient)
+    db.commit()
+    db.refresh(patient)
+
+    return patient
+
+
+def get_patients_service(
+    current_user: User,
+    db: Session
+):
+    if current_user.role == "admin":
+        return db.query(Patient).all()
+
+    return db.query(Patient).filter(
+        Patient.created_by == current_user.id
+    ).all()
+
+
+def get_patient_service(
+    patient_id: int,
+    current_user: User,
+    db: Session
+):
+    patient = db.query(Patient).filter(
+        Patient.id == patient_id
+    ).first()
+
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Patient not found"
+        )
+
+    if (
+        current_user.role != "admin"
+        and patient.created_by != current_user.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this patient"
+        )
+
+    return patient
+
+
+def update_patient_service(
+    patient_id: int,
+    patient_data: PatientUpdate,
+    current_user: User,
+    db: Session
+):
+    patient = get_patient_service(
+        patient_id,
+        current_user,
+        db
+    )
+
+    update_data = patient_data.model_dump(
+        exclude_unset=True
+    )
+
+    for field, value in update_data.items():
+        setattr(patient, field, value)
+
+    db.commit()
+    db.refresh(patient)
+
+    return patient
+
+
+def delete_patient_service(
+    patient_id: int,
+    current_user: User,
+    db: Session
+):
+    patient = get_patient_service(
+        patient_id,
+        current_user,
+        db
+    )
+
+    db.delete(patient)
+    db.commit()
+
+    return {
+        "message": "Patient deleted successfully"
+    }

@@ -4,21 +4,17 @@ from sqlalchemy import text
 from app.database import engine, Base
 from app import models
 
-from app.routers import auth
+from app.routers import auth, patients
 
 
-# =========================================================
 # CREATE DATABASE TABLES
-# =========================================================
 
 Base.metadata.create_all(
     bind=engine
 )
 
 
-# =========================================================
 # FASTAPI APP
-# =========================================================
 
 app = FastAPI(
     title="AI Healthcare Risk & Patient Analytics System",
@@ -37,18 +33,14 @@ app = FastAPI(
 )
 
 
-# =========================================================
 # ROUTERS
-# =========================================================
 
 app.include_router(
     auth.router
 )
 
 
-# =========================================================
 # HOME
-# =========================================================
 
 @app.get("/")
 def home():
@@ -59,9 +51,7 @@ def home():
     }
 
 
-# =========================================================
 # HEALTH CHECK
-# =========================================================
 
 @app.get("/health")
 def health_check():
@@ -71,9 +61,7 @@ def health_check():
     }
 
 
-# =========================================================
 # DATABASE CHECK
-# =========================================================
 
 @app.get("/database-check")
 def database_check():
@@ -99,9 +87,7 @@ def database_check():
         }
 
 
-# =========================================================
 # TABLE CHECK
-# =========================================================
 
 @app.get("/tables")
 def get_tables():
@@ -135,3 +121,5 @@ def get_tables():
             "status": "error",
             "message": str(e)
         }
+        
+app.include_router(patients.router)
