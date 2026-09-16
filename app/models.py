@@ -13,10 +13,6 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 
-# =========================================================
-# USER TABLE
-# =========================================================
-
 class User(Base):
 
     __tablename__ = "users"
@@ -55,16 +51,11 @@ class User(Base):
         server_default=func.now()
     )
 
-    # Relationship
     patients = relationship(
         "Patient",
         back_populates="created_by_user"
     )
 
-
-# =========================================================
-# PATIENT TABLE
-# =========================================================
 
 class Patient(Base):
 
@@ -124,23 +115,23 @@ class Patient(Base):
         server_default=func.now()
     )
 
-    # Relationship with User
     created_by_user = relationship(
         "User",
         back_populates="patients"
     )
 
-    # Relationship with Health Record
     health_records = relationship(
         "HealthRecord",
         back_populates="patient",
         cascade="all, delete"
     )
 
+    medical_reports = relationship(
+        "MedicalReport",
+        back_populates="patient",
+        cascade="all, delete"
+    )
 
-# =========================================================
-# HEALTH RECORD TABLE
-# =========================================================
 
 class HealthRecord(Base):
 
@@ -188,8 +179,54 @@ class HealthRecord(Base):
         server_default=func.now()
     )
 
-    # Relationship
     patient = relationship(
         "Patient",
         back_populates="health_records"
+    )
+
+
+class MedicalReport(Base):
+
+    __tablename__ = "medical_reports"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    patient_id = Column(
+        Integer,
+        ForeignKey("patients.id"),
+        nullable=False
+    )
+
+    file_name = Column(
+        String(255),
+        nullable=False
+    )
+
+    file_path = Column(
+        String(500),
+        nullable=False
+    )
+
+    file_type = Column(
+        String(50),
+        nullable=False
+    )
+
+    extracted_text = Column(
+        Text,
+        nullable=True
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+    patient = relationship(
+        "Patient",
+        back_populates="medical_reports"
     )
