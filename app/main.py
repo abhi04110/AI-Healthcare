@@ -4,7 +4,12 @@ from sqlalchemy import text
 from app.database import engine, Base
 from app import models
 
-from app.routers import auth, patients
+from app.routers import (
+    auth,
+    patients,
+    reports,
+    ocr
+)
 
 
 Base.metadata.create_all(
@@ -35,6 +40,14 @@ app.include_router(
 
 app.include_router(
     patients.router
+)
+
+app.include_router(
+    reports.router
+)
+
+app.include_router(
+    ocr.router
 )
 
 
