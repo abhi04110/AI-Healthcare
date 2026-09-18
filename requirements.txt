@@ -9,3 +9,12 @@ pyjwt
 pwdlib[argon2]
 python-multipart
 email-validator
+
+pytesseract
+pillow
+pypdf
+
+pandas
+numpy
+scikit-learn
+joblib

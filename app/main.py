@@ -8,7 +8,10 @@ from app.routers import (
     auth,
     patients,
     reports,
-    ocr
+    ocr,
+    prediction,
+    clustering,
+    analytics
 )
 
 
@@ -48,6 +51,18 @@ app.include_router(
 
 app.include_router(
     ocr.router
+)
+
+app.include_router(
+    prediction.router
+)
+
+app.include_router(
+    clustering.router
+)
+
+app.include_router(
+    analytics.router
 )
 
 
