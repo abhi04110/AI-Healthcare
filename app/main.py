@@ -11,7 +11,8 @@ from app.routers import (
     ocr,
     prediction,
     clustering,
-    analytics
+    analytics,
+    assistant
 )
 
 
@@ -31,44 +32,24 @@ app = FastAPI(
     - Medical Report OCR
     - Patient Clustering
     - Healthcare Analytics
-    - AI Assistant
+    - AI Healthcare Assistant
     """,
     version="1.0.0"
 )
 
 
-app.include_router(
-    auth.router
-)
-
-app.include_router(
-    patients.router
-)
-
-app.include_router(
-    reports.router
-)
-
-app.include_router(
-    ocr.router
-)
-
-app.include_router(
-    prediction.router
-)
-
-app.include_router(
-    clustering.router
-)
-
-app.include_router(
-    analytics.router
-)
+app.include_router(auth.router)
+app.include_router(patients.router)
+app.include_router(reports.router)
+app.include_router(ocr.router)
+app.include_router(prediction.router)
+app.include_router(clustering.router)
+app.include_router(analytics.router)
+app.include_router(assistant.router)
 
 
 @app.get("/")
 def home():
-
     return {
         "message": "AI Healthcare Risk & Patient Analytics System is running successfully",
         "status": "success"
@@ -77,7 +58,6 @@ def home():
 
 @app.get("/health")
 def health_check():
-
     return {
         "status": "healthy"
     }
@@ -85,11 +65,8 @@ def health_check():
 
 @app.get("/database-check")
 def database_check():
-
     try:
-
         with engine.connect() as connection:
-
             connection.execute(
                 text("SELECT 1")
             )
@@ -100,7 +77,6 @@ def database_check():
         }
 
     except Exception as e:
-
         return {
             "status": "error",
             "message": str(e)
@@ -109,11 +85,8 @@ def database_check():
 
 @app.get("/tables")
 def get_tables():
-
     try:
-
         with engine.connect() as connection:
-
             result = connection.execute(
                 text("""
                     SELECT table_name
@@ -134,7 +107,6 @@ def get_tables():
         }
 
     except Exception as e:
-
         return {
             "status": "error",
             "message": str(e)

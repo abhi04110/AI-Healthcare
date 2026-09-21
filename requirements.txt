@@ -18,3 +18,7 @@ pandas
 numpy
 scikit-learn
 joblib
+
+langchain
+langchain-google-genai
+langchain-groq
