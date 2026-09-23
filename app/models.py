@@ -5,7 +5,8 @@ from sqlalchemy import (
     Float,
     Text,
     DateTime,
-    ForeignKey
+    ForeignKey,
+    JSON
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -132,6 +133,12 @@ class Patient(Base):
         cascade="all, delete"
     )
 
+    risk_predictions = relationship(
+        "RiskPrediction",
+        back_populates="patient",
+        cascade="all, delete"
+    )
+
 
 class HealthRecord(Base):
 
@@ -174,6 +181,11 @@ class HealthRecord(Base):
         nullable=True
     )
 
+    risk_label = Column(
+        String(20),
+        nullable=True
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now()
@@ -182,6 +194,12 @@ class HealthRecord(Base):
     patient = relationship(
         "Patient",
         back_populates="health_records"
+    )
+
+    risk_predictions = relationship(
+        "RiskPrediction",
+        back_populates="health_record",
+        cascade="all, delete"
     )
 
 
@@ -229,4 +247,59 @@ class MedicalReport(Base):
     patient = relationship(
         "Patient",
         back_populates="medical_reports"
+    )
+
+
+class RiskPrediction(Base):
+
+    __tablename__ = "risk_predictions"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    patient_id = Column(
+        Integer,
+        ForeignKey("patients.id"),
+        nullable=False,
+        index=True
+    )
+
+    health_record_id = Column(
+        Integer,
+        ForeignKey("health_records.id"),
+        nullable=False,
+        index=True
+    )
+
+    risk = Column(
+        String(20),
+        nullable=False
+    )
+
+    confidence = Column(
+        Float,
+        nullable=False
+    )
+
+    probabilities = Column(
+        JSON,
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+    patient = relationship(
+        "Patient",
+        back_populates="risk_predictions"
+    )
+
+    health_record = relationship(
+        "HealthRecord",
+        back_populates="risk_predictions"
     )

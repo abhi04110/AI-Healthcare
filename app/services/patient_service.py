@@ -1,8 +1,19 @@
-from fastapi import HTTPException, status
+from fastapi import (
+    HTTPException,
+    status
+)
+
 from sqlalchemy.orm import Session
 
-from app.models import Patient, User
-from app.schemas import PatientCreate, PatientUpdate
+from app.models import (
+    Patient,
+    User
+)
+
+from app.schemas import (
+    PatientCreate,
+    PatientUpdate
+)
 
 
 def create_patient_service(
@@ -10,9 +21,14 @@ def create_patient_service(
     current_user: User,
     db: Session
 ):
-    existing_patient = db.query(Patient).filter(
-        Patient.patient_code == patient_data.patient_code
-    ).first()
+    existing_patient = (
+        db.query(Patient)
+        .filter(
+            Patient.patient_code
+            == patient_data.patient_code
+        )
+        .first()
+    )
 
     if existing_patient:
         raise HTTPException(
@@ -21,13 +37,15 @@ def create_patient_service(
         )
 
     patient = Patient(
-        patient_code=patient_data.patient_code,
-        name=patient_data.name,
+        patient_code=patient_data.patient_code.strip(),
+        name=patient_data.name.strip(),
         age=patient_data.age,
-        gender=patient_data.gender,
+        gender=patient_data.gender.strip(),
         phone=patient_data.phone,
         address=patient_data.address,
-        medical_history=patient_data.medical_history,
+        medical_history=(
+            patient_data.medical_history
+        ),
         created_by=current_user.id
     )
 
@@ -42,12 +60,21 @@ def get_patients_service(
     current_user: User,
     db: Session
 ):
-    if current_user.role == "admin":
-        return db.query(Patient).all()
+    query = db.query(Patient)
 
-    return db.query(Patient).filter(
-        Patient.created_by == current_user.id
-    ).all()
+    if current_user.role != "admin":
+        query = query.filter(
+            Patient.created_by == current_user.id
+        )
+
+    return (
+        query
+        .order_by(
+            Patient.created_at.desc(),
+            Patient.id.desc()
+        )
+        .all()
+    )
 
 
 def get_patient_service(
@@ -55,9 +82,13 @@ def get_patient_service(
     current_user: User,
     db: Session
 ):
-    patient = db.query(Patient).filter(
-        Patient.id == patient_id
-    ).first()
+    patient = (
+        db.query(Patient)
+        .filter(
+            Patient.id == patient_id
+        )
+        .first()
+    )
 
     if not patient:
         raise HTTPException(
@@ -71,7 +102,10 @@ def get_patient_service(
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this patient"
+            detail=(
+                "You do not have access "
+                "to this patient"
+            )
         )
 
     return patient
@@ -84,9 +118,9 @@ def update_patient_service(
     db: Session
 ):
     patient = get_patient_service(
-        patient_id,
-        current_user,
-        db
+        patient_id=patient_id,
+        current_user=current_user,
+        db=db
     )
 
     update_data = patient_data.model_dump(
@@ -94,7 +128,22 @@ def update_patient_service(
     )
 
     for field, value in update_data.items():
-        setattr(patient, field, value)
+
+        if (
+            isinstance(value, str)
+            and field in {
+                "name",
+                "gender",
+                "phone"
+            }
+        ):
+            value = value.strip()
+
+        setattr(
+            patient,
+            field,
+            value
+        )
 
     db.commit()
     db.refresh(patient)
@@ -108,9 +157,9 @@ def delete_patient_service(
     db: Session
 ):
     patient = get_patient_service(
-        patient_id,
-        current_user,
-        db
+        patient_id=patient_id,
+        current_user=current_user,
+        db=db
     )
 
     db.delete(patient)

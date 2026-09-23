@@ -5,7 +5,11 @@ from fastapi import (
     status
 )
 
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import (
+    HTTPBearer,
+    HTTPAuthorizationCredentials
+)
+
 from sqlalchemy.orm import Session
 
 import jwt
@@ -72,20 +76,22 @@ def login_user(
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials = Depends(
+        security
+    ),
     db: Session = Depends(get_db)
 ):
-
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"}
+        headers={
+            "WWW-Authenticate": "Bearer"
+        }
     )
 
     token = credentials.credentials
 
     try:
-
         payload = jwt.decode(
             token,
             JWT_SECRET_KEY,
@@ -102,12 +108,19 @@ def get_current_user(
 
     try:
         user_id = int(user_id)
-    except (TypeError, ValueError):
+    except (
+        TypeError,
+        ValueError
+    ):
         raise credentials_exception
 
-    user = db.query(User).filter(
-        User.id == user_id
-    ).first()
+    user = (
+        db.query(User)
+        .filter(
+            User.id == user_id
+        )
+        .first()
+    )
 
     if user is None:
         raise credentials_exception
@@ -115,11 +128,47 @@ def get_current_user(
     return user
 
 
+def require_admin(
+    current_user: User = Depends(
+        get_current_user
+    )
+):
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+
+    return current_user
+
+
+def require_staff(
+    current_user: User = Depends(
+        get_current_user
+    )
+):
+    allowed_roles = {
+        "admin",
+        "doctor",
+        "staff"
+    }
+
+    if current_user.role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Staff access required"
+        )
+
+    return current_user
+
+
 @router.get(
     "/me",
     response_model=UserResponse
 )
 def get_my_profile(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        get_current_user
+    )
 ):
-    return current_user 
+    return current_user

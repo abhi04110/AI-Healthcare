@@ -1,12 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException
+)
 
+from sqlalchemy.orm import Session
+
+from app.database import get_db
 from app.models import User
 from app.routers.auth import get_current_user
 
 from app.services.clustering_service import (
-    kmeans_clustering,
-    dbscan_clustering,
-    hierarchical_clustering
+    kmeans_database_clustering,
+    dbscan_database_clustering,
+    hierarchical_database_clustering
 )
 
 
@@ -18,51 +25,52 @@ router = APIRouter(
 
 @router.post("/kmeans")
 def run_kmeans(
-    records: list[dict],
     n_clusters: int = 3,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        get_current_user
+    ),
+    db: Session = Depends(get_db)
 ):
-    if not records:
-        raise HTTPException(
-            status_code=400,
-            detail="Patient data is required"
-        )
-
     try:
-        result = kmeans_clustering(
-            data=records,
+        clusters = kmeans_database_clustering(
+            db=db,
+            current_user=current_user,
             n_clusters=n_clusters
         )
 
         return {
             "status": "success",
             "algorithm": "K-Means",
-            "clusters": result
+            "patients_used": len(clusters),
+            "clusters": clusters
         }
 
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(
             status_code=400,
             detail=str(e)
         )
 
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"K-Means clustering failed: {str(e)}"
+        )
+
 
 @router.post("/dbscan")
 def run_dbscan(
-    records: list[dict],
     eps: float = 1.5,
     min_samples: int = 2,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        get_current_user
+    ),
+    db: Session = Depends(get_db)
 ):
-    if not records:
-        raise HTTPException(
-            status_code=400,
-            detail="Patient data is required"
-        )
-
     try:
-        result = dbscan_clustering(
-            data=records,
+        clusters = dbscan_database_clustering(
+            db=db,
+            current_user=current_user,
             eps=eps,
             min_samples=min_samples
         )
@@ -70,42 +78,53 @@ def run_dbscan(
         return {
             "status": "success",
             "algorithm": "DBSCAN",
-            "clusters": result
+            "patients_used": len(clusters),
+            "clusters": clusters
         }
 
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(
             status_code=400,
             detail=str(e)
         )
 
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"DBSCAN clustering failed: {str(e)}"
+        )
+
 
 @router.post("/hierarchical")
 def run_hierarchical(
-    records: list[dict],
     n_clusters: int = 3,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        get_current_user
+    ),
+    db: Session = Depends(get_db)
 ):
-    if not records:
-        raise HTTPException(
-            status_code=400,
-            detail="Patient data is required"
-        )
-
     try:
-        result = hierarchical_clustering(
-            data=records,
+        clusters = hierarchical_database_clustering(
+            db=db,
+            current_user=current_user,
             n_clusters=n_clusters
         )
 
         return {
             "status": "success",
             "algorithm": "Hierarchical",
-            "clusters": result
+            "patients_used": len(clusters),
+            "clusters": clusters
         }
 
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(
             status_code=400,
             detail=str(e)
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Hierarchical clustering failed: {str(e)}"
         )

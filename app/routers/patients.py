@@ -13,7 +13,9 @@ from app.database import get_db
 from app.models import (
     User,
     Patient,
-    HealthRecord
+    HealthRecord,
+    MedicalReport,
+    RiskPrediction
 )
 
 from app.schemas import (
@@ -55,10 +57,11 @@ def create_patient(
     phone: str | None = Form(None),
     address: str | None = Form(None),
     medical_history: str | None = Form(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     patient_data = PatientCreate(
         patient_code=patient_code,
         name=name,
@@ -81,10 +84,11 @@ def create_patient(
     response_model=list[PatientResponse]
 )
 def get_patients(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     return get_patients_service(
         current_user=current_user,
         db=db
@@ -97,10 +101,11 @@ def get_patients(
 )
 def get_patient(
     patient_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     return get_patient_service(
         patient_id=patient_id,
         current_user=current_user,
@@ -120,10 +125,11 @@ def update_patient(
     phone: str | None = Form(None),
     address: str | None = Form(None),
     medical_history: str | None = Form(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     patient_data = PatientUpdate(
         name=name,
         age=age,
@@ -146,10 +152,11 @@ def update_patient(
 )
 def delete_patient(
     patient_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     return delete_patient_service(
         patient_id=patient_id,
         current_user=current_user,
@@ -169,10 +176,11 @@ def create_health_record(
     bmi: float | None = Form(None),
     cholesterol: float | None = Form(None),
     heart_rate: float | None = Form(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     patient = get_patient_service(
         patient_id=patient_id,
         current_user=current_user,
@@ -190,10 +198,16 @@ def create_health_record(
     record = HealthRecord(
         patient_id=patient.id,
         glucose=health_record_data.glucose,
-        blood_pressure=health_record_data.blood_pressure,
+        blood_pressure=(
+            health_record_data.blood_pressure
+        ),
         bmi=health_record_data.bmi,
-        cholesterol=health_record_data.cholesterol,
-        heart_rate=health_record_data.heart_rate
+        cholesterol=(
+            health_record_data.cholesterol
+        ),
+        heart_rate=(
+            health_record_data.heart_rate
+        )
     )
 
     db.add(record)
@@ -209,19 +223,28 @@ def create_health_record(
 )
 def get_health_records(
     patient_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     patient = get_patient_service(
         patient_id=patient_id,
         current_user=current_user,
         db=db
     )
 
-    return db.query(HealthRecord).filter(
-        HealthRecord.patient_id == patient.id
-    ).all()
+    return (
+        db.query(HealthRecord)
+        .filter(
+            HealthRecord.patient_id == patient.id
+        )
+        .order_by(
+            HealthRecord.created_at.desc(),
+            HealthRecord.id.desc()
+        )
+        .all()
+    )
 
 
 @router.get(
@@ -231,20 +254,25 @@ def get_health_records(
 def get_health_record(
     patient_id: int,
     record_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     patient = get_patient_service(
         patient_id=patient_id,
         current_user=current_user,
         db=db
     )
 
-    record = db.query(HealthRecord).filter(
-        HealthRecord.id == record_id,
-        HealthRecord.patient_id == patient.id
-    ).first()
+    record = (
+        db.query(HealthRecord)
+        .filter(
+            HealthRecord.id == record_id,
+            HealthRecord.patient_id == patient.id
+        )
+        .first()
+    )
 
     if not record:
         raise HTTPException(
@@ -267,20 +295,25 @@ def update_health_record(
     bmi: float | None = Form(None),
     cholesterol: float | None = Form(None),
     heart_rate: float | None = Form(None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     patient = get_patient_service(
         patient_id=patient_id,
         current_user=current_user,
         db=db
     )
 
-    record = db.query(HealthRecord).filter(
-        HealthRecord.id == record_id,
-        HealthRecord.patient_id == patient.id
-    ).first()
+    record = (
+        db.query(HealthRecord)
+        .filter(
+            HealthRecord.id == record_id,
+            HealthRecord.patient_id == patient.id
+        )
+        .first()
+    )
 
     if not record:
         raise HTTPException(
@@ -301,7 +334,11 @@ def update_health_record(
     )
 
     for field, value in update_data.items():
-        setattr(record, field, value)
+        setattr(
+            record,
+            field,
+            value
+        )
 
     db.commit()
     db.refresh(record)
@@ -315,20 +352,25 @@ def update_health_record(
 def delete_health_record(
     patient_id: int,
     record_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     patient = get_patient_service(
         patient_id=patient_id,
         current_user=current_user,
         db=db
     )
 
-    record = db.query(HealthRecord).filter(
-        HealthRecord.id == record_id,
-        HealthRecord.patient_id == patient.id
-    ).first()
+    record = (
+        db.query(HealthRecord)
+        .filter(
+            HealthRecord.id == record_id,
+            HealthRecord.patient_id == patient.id
+        )
+        .first()
+    )
 
     if not record:
         raise HTTPException(
@@ -341,4 +383,123 @@ def delete_health_record(
 
     return {
         "message": "Health record deleted successfully"
+    }
+
+
+@router.get(
+    "/{patient_id}/timeline"
+)
+def get_patient_timeline(
+    patient_id: int,
+    current_user: User = Depends(
+        get_current_user
+    ),
+    db: Session = Depends(get_db)
+):
+    patient = get_patient_service(
+        patient_id=patient_id,
+        current_user=current_user,
+        db=db
+    )
+
+    health_records = (
+        db.query(HealthRecord)
+        .filter(
+            HealthRecord.patient_id == patient.id
+        )
+        .order_by(
+            HealthRecord.created_at.desc(),
+            HealthRecord.id.desc()
+        )
+        .all()
+    )
+
+    reports = (
+        db.query(MedicalReport)
+        .filter(
+            MedicalReport.patient_id == patient.id
+        )
+        .order_by(
+            MedicalReport.created_at.desc(),
+            MedicalReport.id.desc()
+        )
+        .all()
+    )
+
+    predictions = (
+        db.query(RiskPrediction)
+        .filter(
+            RiskPrediction.patient_id == patient.id
+        )
+        .order_by(
+            RiskPrediction.created_at.desc(),
+            RiskPrediction.id.desc()
+        )
+        .all()
+    )
+
+    return {
+        "status": "success",
+        "patient": {
+            "id": patient.id,
+            "patient_code": patient.patient_code,
+            "name": patient.name,
+            "age": patient.age,
+            "gender": patient.gender,
+            "phone": patient.phone,
+            "address": patient.address,
+            "medical_history": patient.medical_history
+        },
+        "health_records": [
+            {
+                "id": record.id,
+                "glucose": record.glucose,
+                "blood_pressure": record.blood_pressure,
+                "bmi": record.bmi,
+                "cholesterol": record.cholesterol,
+                "heart_rate": record.heart_rate,
+                "risk_label": record.risk_label,
+                "created_at": (
+                    record.created_at.isoformat()
+                    if record.created_at
+                    else None
+                )
+            }
+            for record in health_records
+        ],
+        "medical_reports": [
+            {
+                "id": report.id,
+                "file_name": report.file_name,
+                "file_type": report.file_type,
+                "extracted_text": (
+                    report.extracted_text
+                ),
+                "created_at": (
+                    report.created_at.isoformat()
+                    if report.created_at
+                    else None
+                )
+            }
+            for report in reports
+        ],
+        "risk_predictions": [
+            {
+                "id": prediction.id,
+                "health_record_id": (
+                    prediction.health_record_id
+                ),
+                "risk": prediction.risk,
+                "confidence": prediction.confidence,
+                "probabilities": (
+                    prediction.probabilities
+                ),
+                "created_at": (
+                    prediction.created_at.isoformat()
+                    if prediction.created_at
+                    else None
+                )
+            }
+            for prediction in predictions
+        ]
     }

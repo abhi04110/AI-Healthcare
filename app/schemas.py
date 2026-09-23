@@ -1,8 +1,14 @@
-from pydantic import BaseModel, EmailStr, Field
+from datetime import datetime
+
+from pydantic import (
+    BaseModel,
+    EmailStr,
+    Field,
+    field_validator
+)
 
 
 class UserRegister(BaseModel):
-
     name: str = Field(
         ...,
         min_length=2,
@@ -21,15 +27,43 @@ class UserRegister(BaseModel):
         default="doctor"
     )
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value):
+        value = value.strip()
+
+        if not value:
+            raise ValueError(
+                "Name cannot be empty"
+            )
+
+        return value
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, value):
+        value = value.strip().lower()
+
+        allowed_roles = {
+            "admin",
+            "doctor",
+            "staff"
+        }
+
+        if value not in allowed_roles:
+            raise ValueError(
+                "Role must be admin, doctor, or staff"
+            )
+
+        return value
+
 
 class TokenResponse(BaseModel):
-
     access_token: str
     token_type: str
 
 
 class UserResponse(BaseModel):
-
     id: int
     name: str
     email: EmailStr
@@ -40,7 +74,6 @@ class UserResponse(BaseModel):
 
 
 class PatientCreate(BaseModel):
-
     patient_code: str = Field(
         ...,
         min_length=2,
@@ -76,7 +109,6 @@ class PatientCreate(BaseModel):
 
 
 class PatientUpdate(BaseModel):
-
     name: str | None = Field(
         default=None,
         min_length=2,
@@ -106,7 +138,6 @@ class PatientUpdate(BaseModel):
 
 
 class PatientResponse(BaseModel):
-
     id: int
     patient_code: str
     name: str
@@ -122,25 +153,60 @@ class PatientResponse(BaseModel):
 
 
 class HealthRecordCreate(BaseModel):
+    glucose: float | None = Field(
+        default=None,
+        ge=0
+    )
 
-    glucose: float | None = None
-    blood_pressure: float | None = None
-    bmi: float | None = None
-    cholesterol: float | None = None
-    heart_rate: float | None = None
+    blood_pressure: float | None = Field(
+        default=None,
+        ge=0
+    )
+
+    bmi: float | None = Field(
+        default=None,
+        ge=0
+    )
+
+    cholesterol: float | None = Field(
+        default=None,
+        ge=0
+    )
+
+    heart_rate: float | None = Field(
+        default=None,
+        ge=0
+    )
 
 
 class HealthRecordUpdate(BaseModel):
+    glucose: float | None = Field(
+        default=None,
+        ge=0
+    )
 
-    glucose: float | None = None
-    blood_pressure: float | None = None
-    bmi: float | None = None
-    cholesterol: float | None = None
-    heart_rate: float | None = None
+    blood_pressure: float | None = Field(
+        default=None,
+        ge=0
+    )
+
+    bmi: float | None = Field(
+        default=None,
+        ge=0
+    )
+
+    cholesterol: float | None = Field(
+        default=None,
+        ge=0
+    )
+
+    heart_rate: float | None = Field(
+        default=None,
+        ge=0
+    )
 
 
 class HealthRecordResponse(BaseModel):
-
     id: int
     patient_id: int
     glucose: float | None
@@ -148,19 +214,33 @@ class HealthRecordResponse(BaseModel):
     bmi: float | None
     cholesterol: float | None
     heart_rate: float | None
+    risk_label: str | None
+    created_at: datetime | None
 
     class Config:
         from_attributes = True
 
 
 class MedicalReportResponse(BaseModel):
-
     id: int
     patient_id: int
     file_name: str
     file_path: str
     file_type: str
     extracted_text: str | None
+
+    class Config:
+        from_attributes = True
+
+
+class RiskPredictionResponse(BaseModel):
+    id: int
+    patient_id: int
+    health_record_id: int
+    risk: str
+    confidence: float
+    probabilities: dict[str, float]
+    created_at: datetime | None
 
     class Config:
         from_attributes = True
