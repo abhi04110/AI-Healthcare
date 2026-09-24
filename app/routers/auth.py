@@ -1,7 +1,10 @@
+from typing import Literal
+
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Form,
     status
 )
 
@@ -26,7 +29,8 @@ from app.schemas import (
 
 from app.services.auth_service import (
     register_user_service,
-    login_user_service
+    login_user_service,
+    create_user_by_admin_service
 )
 
 from app.config import (
@@ -50,9 +54,21 @@ security = HTTPBearer()
     status_code=status.HTTP_201_CREATED
 )
 def register_user(
-    user: UserRegister,
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    role: Literal["doctor", "staff"] = Form(
+        default="doctor"
+    ),
     db: Session = Depends(get_db)
 ):
+    user = UserRegister(
+        name=name,
+        email=email,
+        password=password,
+        role=role
+    )
+
     return register_user_service(
         user=user,
         db=db
@@ -64,8 +80,8 @@ def register_user(
     response_model=TokenResponse
 )
 def login_user(
-    email: str,
-    password: str,
+    email: str = Form(...),
+    password: str = Form(...),
     db: Session = Depends(get_db)
 ):
     return login_user_service(
@@ -160,6 +176,40 @@ def require_staff(
         )
 
     return current_user
+
+
+@router.post(
+    "/users",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def create_user_by_admin(
+    name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    role: Literal[
+        "admin",
+        "doctor",
+        "staff"
+    ] = Form(
+        default="doctor"
+    ),
+    current_user: User = Depends(
+        require_admin
+    ),
+    db: Session = Depends(get_db)
+):
+    user = UserRegister(
+        name=name,
+        email=email,
+        password=password,
+        role=role
+    )
+
+    return create_user_by_admin_service(
+        user=user,
+        db=db
+    )
 
 
 @router.get(

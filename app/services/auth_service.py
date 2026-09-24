@@ -15,16 +15,22 @@ from app.utils.security import (
 )
 
 
-VALID_ROLES = {
+PUBLIC_ROLES = {
+    "doctor",
+    "staff"
+}
+
+ALL_ROLES = {
     "admin",
     "doctor",
     "staff"
 }
 
 
-def register_user_service(
+def create_user_service(
     user: UserRegister,
-    db: Session
+    db: Session,
+    allow_admin: bool = False
 ):
     existing_user = (
         db.query(User)
@@ -42,12 +48,26 @@ def register_user_service(
 
     role = user.role.strip().lower()
 
-    if role not in VALID_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
+    allowed_roles = (
+        ALL_ROLES
+        if allow_admin
+        else PUBLIC_ROLES
+    )
+
+    if role not in allowed_roles:
+        if allow_admin:
+            detail = (
                 "Role must be admin, doctor, or staff"
             )
+        else:
+            detail = (
+                "Public registration only allows "
+                "doctor or staff role"
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=detail
         )
 
     hashed_password = hash_password(
@@ -66,6 +86,28 @@ def register_user_service(
     db.refresh(new_user)
 
     return new_user
+
+
+def register_user_service(
+    user: UserRegister,
+    db: Session
+):
+    return create_user_service(
+        user=user,
+        db=db,
+        allow_admin=False
+    )
+
+
+def create_user_by_admin_service(
+    user: UserRegister,
+    db: Session
+):
+    return create_user_service(
+        user=user,
+        db=db,
+        allow_admin=True
+    )
 
 
 def login_user_service(

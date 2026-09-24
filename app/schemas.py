@@ -207,7 +207,6 @@ class HealthRecordUpdate(BaseModel):
 
 
 class HealthRecordResponse(BaseModel):
-    id: int
     patient_id: int
     glucose: float | None
     blood_pressure: float | None
@@ -222,7 +221,6 @@ class HealthRecordResponse(BaseModel):
 
 
 class MedicalReportResponse(BaseModel):
-    id: int
     patient_id: int
     file_name: str
     file_path: str
@@ -234,9 +232,7 @@ class MedicalReportResponse(BaseModel):
 
 
 class RiskPredictionResponse(BaseModel):
-    id: int
     patient_id: int
-    health_record_id: int
     risk: str
     confidence: float
     probabilities: dict[str, float]

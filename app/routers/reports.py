@@ -64,10 +64,11 @@ os.makedirs(
 async def upload_medical_report(
     patient_id: int,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     get_patient_service(
         patient_id=patient_id,
         current_user=current_user,
@@ -114,12 +115,10 @@ async def upload_medical_report(
     )
 
     try:
-
         with open(
             file_path,
             "wb"
         ) as output_file:
-
             output_file.write(
                 file_content
             )
@@ -147,7 +146,11 @@ async def upload_medical_report(
 
         return report
 
+    except HTTPException:
+        raise
+
     except Exception as e:
+        db.rollback()
 
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -159,87 +162,108 @@ async def upload_medical_report(
 
 
 @router.get(
-    "/patient/{patient_id}",
+    "/{patient_id}",
     response_model=list[MedicalReportResponse]
 )
 def get_patient_reports(
     patient_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
-
     get_patient_service(
         patient_id=patient_id,
         current_user=current_user,
         db=db
     )
 
-    reports = db.query(
-        MedicalReport
-    ).filter(
-        MedicalReport.patient_id == patient_id
-    ).all()
+    reports = (
+        db.query(MedicalReport)
+        .filter(
+            MedicalReport.patient_id == patient_id
+        )
+        .order_by(
+            MedicalReport.created_at.desc(),
+            MedicalReport.id.desc()
+        )
+        .all()
+    )
 
     return reports
 
 
 @router.get(
-    "/{report_id}",
+    "/{patient_id}/latest",
     response_model=MedicalReportResponse
 )
-def get_report(
-    report_id: int,
-    current_user: User = Depends(get_current_user),
+def get_latest_patient_report(
+    patient_id: int,
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
+    get_patient_service(
+        patient_id=patient_id,
+        current_user=current_user,
+        db=db
+    )
 
-    report = db.query(
-        MedicalReport
-    ).filter(
-        MedicalReport.id == report_id
-    ).first()
+    report = (
+        db.query(MedicalReport)
+        .filter(
+            MedicalReport.patient_id == patient_id
+        )
+        .order_by(
+            MedicalReport.created_at.desc(),
+            MedicalReport.id.desc()
+        )
+        .first()
+    )
 
     if not report:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Medical report not found"
+            detail="No medical report found for this patient"
         )
-
-    get_patient_service(
-        patient_id=report.patient_id,
-        current_user=current_user,
-        db=db
-    )
 
     return report
 
 
 @router.delete(
-    "/{report_id}"
+    "/{patient_id}/latest"
 )
-def delete_report(
-    report_id: int,
-    current_user: User = Depends(get_current_user),
+def delete_latest_patient_report(
+    patient_id: int,
+    current_user: User = Depends(
+        get_current_user
+    ),
     db: Session = Depends(get_db)
 ):
+    get_patient_service(
+        patient_id=patient_id,
+        current_user=current_user,
+        db=db
+    )
 
-    report = db.query(
-        MedicalReport
-    ).filter(
-        MedicalReport.id == report_id
-    ).first()
+    report = (
+        db.query(MedicalReport)
+        .filter(
+            MedicalReport.patient_id == patient_id
+        )
+        .order_by(
+            MedicalReport.created_at.desc(),
+            MedicalReport.id.desc()
+        )
+        .first()
+    )
 
     if not report:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Medical report not found"
+            detail="No medical report found for this patient"
         )
-
-    get_patient_service(
-        patient_id=report.patient_id,
-        current_user=current_user,
-        db=db
-    )
 
     if os.path.exists(report.file_path):
         os.remove(report.file_path)
@@ -248,5 +272,6 @@ def delete_report(
     db.commit()
 
     return {
-        "message": "Medical report deleted successfully"
+        "message": "Latest medical report deleted successfully",
+        "patient_id": patient_id
     }

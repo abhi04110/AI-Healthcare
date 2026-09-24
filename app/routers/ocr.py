@@ -17,6 +17,7 @@ from app.models import (
 )
 
 from app.routers.auth import get_current_user
+
 from app.routers.patients import get_patient_service
 
 
@@ -27,9 +28,17 @@ router = APIRouter(
 
 
 MEDICAL_FIELDS = {
-    "hemoglobin": ["Hemoglobin"],
-    "wbc_count": ["WBC Count", "WBC"],
-    "rbc_count": ["RBC Count", "RBC"],
+    "hemoglobin": [
+        "Hemoglobin"
+    ],
+    "wbc_count": [
+        "WBC Count",
+        "WBC"
+    ],
+    "rbc_count": [
+        "RBC Count",
+        "RBC"
+    ],
     "platelet_count": [
         "Platelet Count",
         "Platelets"
@@ -46,11 +55,40 @@ MEDICAL_FIELDS = {
         "Total Bilirubin",
         "Bilirubin"
     ],
-    "albumin": ["Albumin"],
-    "creatinine": ["Creatinine"],
-    "urea": ["Urea"],
-    "uric_acid": ["Uric Acid"],
-    "tsh": ["TSH"]
+    "albumin": [
+        "Albumin"
+    ],
+    "creatinine": [
+        "Creatinine"
+    ],
+    "urea": [
+        "Urea"
+    ],
+    "uric_acid": [
+        "Uric Acid"
+    ],
+    "tsh": [
+        "TSH"
+    ],
+    "glucose": [
+        "Glucose",
+        "Blood Glucose",
+        "Fasting Glucose",
+        "Random Glucose"
+    ],
+    "bmi": [
+        "BMI",
+        "Body Mass Index"
+    ],
+    "cholesterol": [
+        "Total Cholesterol",
+        "Cholesterol"
+    ],
+    "heart_rate": [
+        "Heart Rate",
+        "Pulse Rate",
+        "Pulse"
+    ]
 }
 
 
@@ -59,7 +97,6 @@ def extract_numeric_value(
     labels: list[str]
 ):
     for label in labels:
-
         pattern = (
             rf"{re.escape(label)}"
             r"\s*[:\-]?\s*"
@@ -83,6 +120,37 @@ def extract_numeric_value(
     return None
 
 
+def extract_blood_pressure(
+    text: str
+):
+    labels = [
+        "Blood Pressure",
+        "BP"
+    ]
+
+    for label in labels:
+        pattern = (
+            rf"{re.escape(label)}"
+            r"\s*[:\-]?\s*"
+            r"([0-9]{2,3})"
+            r"\s*/\s*"
+            r"([0-9]{2,3})"
+        )
+
+        match = re.search(
+            pattern,
+            text,
+            re.IGNORECASE
+        )
+
+        if match:
+            return float(
+                match.group(1)
+            )
+
+    return None
+
+
 def extract_medical_values(
     extracted_text: str
 ):
@@ -94,23 +162,34 @@ def extract_medical_values(
             labels
         )
 
+    result["blood_pressure"] = (
+        extract_blood_pressure(
+            extracted_text
+        )
+    )
+
     return result
 
 
-@router.get(
-    "/report/{report_id}/values"
-)
-def extract_report_values(
-    report_id: int,
-    current_user: User = Depends(
-        get_current_user
-    ),
-    db: Session = Depends(get_db)
+def get_latest_report(
+    patient_id: int,
+    current_user: User,
+    db: Session
 ):
+    get_patient_service(
+        patient_id=patient_id,
+        current_user=current_user,
+        db=db
+    )
+
     report = (
         db.query(MedicalReport)
         .filter(
-            MedicalReport.id == report_id
+            MedicalReport.patient_id == patient_id
+        )
+        .order_by(
+            MedicalReport.created_at.desc(),
+            MedicalReport.id.desc()
         )
         .first()
     )
@@ -118,11 +197,24 @@ def extract_report_values(
     if not report:
         raise HTTPException(
             status_code=404,
-            detail="Medical report not found"
+            detail="No medical report found for this patient"
         )
 
-    get_patient_service(
-        patient_id=report.patient_id,
+    return report
+
+
+@router.get(
+    "/patient/{patient_id}/values"
+)
+def extract_patient_report_values(
+    patient_id: int,
+    current_user: User = Depends(
+        get_current_user
+    ),
+    db: Session = Depends(get_db)
+):
+    report = get_latest_report(
+        patient_id=patient_id,
         current_user=current_user,
         db=db
     )
@@ -130,7 +222,7 @@ def extract_report_values(
     if not report.extracted_text:
         raise HTTPException(
             status_code=400,
-            detail="No OCR text available for this report"
+            detail="No OCR text available for the latest report"
         )
 
     values = extract_medical_values(
@@ -138,38 +230,38 @@ def extract_report_values(
     )
 
     return {
-        "report_id": report.id,
-        "patient_id": report.patient_id,
+        "patient_id": patient_id,
+        "report": {
+            "file_name": report.file_name,
+            "file_type": report.file_type,
+            "created_at": (
+                report.created_at.isoformat()
+                if report.created_at
+                else None
+            )
+        },
         "values": values
     }
 
 
 @router.post(
-    "/report/{report_id}/create-health-record"
+    "/patient/{patient_id}/create-health-record"
 )
 def create_health_record_from_ocr(
-    report_id: int,
+    patient_id: int,
     current_user: User = Depends(
         get_current_user
     ),
     db: Session = Depends(get_db)
 ):
-    report = (
-        db.query(MedicalReport)
-        .filter(
-            MedicalReport.id == report_id
-        )
-        .first()
+    patient = get_patient_service(
+        patient_id=patient_id,
+        current_user=current_user,
+        db=db
     )
 
-    if not report:
-        raise HTTPException(
-            status_code=404,
-            detail="Medical report not found"
-        )
-
-    patient = get_patient_service(
-        patient_id=report.patient_id,
+    report = get_latest_report(
+        patient_id=patient_id,
         current_user=current_user,
         db=db
     )
@@ -177,21 +269,29 @@ def create_health_record_from_ocr(
     if not report.extracted_text:
         raise HTTPException(
             status_code=400,
-            detail="No OCR text available"
+            detail="No OCR text available for the latest report"
         )
 
     values = extract_medical_values(
         report.extracted_text
     )
 
-    glucose = values.get("glucose")
+    glucose = values.get(
+        "glucose"
+    )
+
     blood_pressure = values.get(
         "blood_pressure"
     )
-    bmi = values.get("bmi")
+
+    bmi = values.get(
+        "bmi"
+    )
+
     cholesterol = values.get(
         "cholesterol"
     )
+
     heart_rate = values.get(
         "heart_rate"
     )
@@ -214,7 +314,7 @@ def create_health_record_from_ocr(
             status_code=400,
             detail=(
                 "No supported health record values "
-                "were detected in the OCR text"
+                "were detected in the latest report"
             )
         )
 
@@ -227,19 +327,28 @@ def create_health_record_from_ocr(
         heart_rate=heart_rate
     )
 
-    db.add(health_record)
+    db.add(
+        health_record
+    )
+
     db.commit()
-    db.refresh(health_record)
+
+    db.refresh(
+        health_record
+    )
 
     return {
         "status": "success",
         "message": (
-            "Health record created from OCR data"
+            "Health record created from latest OCR report"
         ),
-        "report_id": report.id,
         "patient_id": patient.id,
+        "report": {
+            "file_name": report.file_name,
+            "file_type": report.file_type
+        },
         "health_record": {
-            "id": health_record.id,
+            "patient_id": patient.id,
             "glucose": health_record.glucose,
             "blood_pressure": (
                 health_record.blood_pressure
@@ -259,8 +368,7 @@ def create_health_record_from_ocr(
         },
         "detected_values": values,
         "note": (
-            "OCR-extracted values should be "
-            "reviewed by healthcare staff before "
-            "clinical use."
+            "OCR-extracted values should be reviewed "
+            "by healthcare staff before clinical use."
         )
     }

@@ -16,10 +16,6 @@ from app.models import (
     RiskPrediction
 )
 
-from app.schemas import (
-    RiskPredictionResponse
-)
-
 from app.routers.auth import (
     get_current_user
 )
@@ -55,7 +51,6 @@ def train_model(
         )
 
     try:
-
         result = train_risk_model(
             db=db
         )
@@ -66,19 +61,15 @@ def train_model(
         }
 
     except ValueError as e:
-
         raise HTTPException(
             status_code=400,
             detail=str(e)
         )
 
     except Exception as e:
-
         raise HTTPException(
             status_code=500,
-            detail=(
-                f"Model training failed: {str(e)}"
-            )
+            detail=f"Model training failed: {str(e)}"
         )
 
 
@@ -99,7 +90,6 @@ def get_training_data(
         )
 
     try:
-
         result = get_training_data_summary(
             db=db
         )
@@ -110,7 +100,6 @@ def get_training_data(
         }
 
     except Exception as e:
-
         raise HTTPException(
             status_code=500,
             detail=(
@@ -147,17 +136,13 @@ def predict_health_risk(
     }
 
     for field, value in health_values.items():
-
         if value < 0:
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    f"{field} cannot be negative"
-                )
+                detail=f"{field} cannot be negative"
             )
 
     try:
-
         result = predict_risk(
             age=age,
             glucose=glucose,
@@ -182,19 +167,15 @@ def predict_health_risk(
         }
 
     except FileNotFoundError as e:
-
         raise HTTPException(
             status_code=404,
             detail=str(e)
         )
 
     except Exception as e:
-
         raise HTTPException(
             status_code=500,
-            detail=(
-                f"Prediction failed: {str(e)}"
-            )
+            detail=f"Prediction failed: {str(e)}"
         )
 
 
@@ -255,7 +236,6 @@ def predict_patient_health_risk(
     ]
 
     if missing_fields:
-
         raise HTTPException(
             status_code=400,
             detail={
@@ -268,7 +248,6 @@ def predict_patient_health_risk(
         )
 
     try:
-
         result = predict_risk(
             age=patient.age,
             glucose=health_record.glucose,
@@ -302,17 +281,14 @@ def predict_patient_health_risk(
                 "Health risk prediction generated "
                 "and saved successfully"
             ),
-            "prediction_id": prediction.id,
             "patient": {
                 "id": patient.id,
-                "patient_code": (
-                    patient.patient_code
-                ),
+                "patient_code": patient.patient_code,
                 "name": patient.name,
                 "age": patient.age
             },
             "health_record": {
-                "id": health_record.id,
+                "patient_id": patient.id,
                 "created_at": (
                     health_record.created_at.isoformat()
                     if health_record.created_at
@@ -326,9 +302,7 @@ def predict_patient_health_risk(
                 "cholesterol": (
                     health_record.cholesterol
                 ),
-                "heart_rate": (
-                    health_record.heart_rate
-                )
+                "heart_rate": health_record.heart_rate
             },
             "prediction": result,
             "data_source": (
@@ -342,27 +316,22 @@ def predict_patient_health_risk(
         }
 
     except FileNotFoundError as e:
-
         raise HTTPException(
             status_code=404,
             detail=str(e)
         )
 
     except Exception as e:
-
         db.rollback()
 
         raise HTTPException(
             status_code=500,
-            detail=(
-                f"Prediction failed: {str(e)}"
-            )
+            detail=f"Prediction failed: {str(e)}"
         )
 
 
 @router.get(
-    "/patient/{patient_id}/history",
-    response_model=list[RiskPredictionResponse]
+    "/patient/{patient_id}/history"
 )
 def get_patient_prediction_history(
     patient_id: int,
@@ -389,12 +358,29 @@ def get_patient_prediction_history(
         .all()
     )
 
-    return predictions
+    return {
+        "status": "success",
+        "patient_id": patient.id,
+        "patient_name": patient.name,
+        "predictions": [
+            {
+                "patient_id": patient.id,
+                "risk": prediction.risk,
+                "confidence": prediction.confidence,
+                "probabilities": prediction.probabilities,
+                "created_at": (
+                    prediction.created_at.isoformat()
+                    if prediction.created_at
+                    else None
+                )
+            }
+            for prediction in predictions
+        ]
+    }
 
 
 @router.get(
-    "/history",
-    response_model=list[RiskPredictionResponse]
+    "/history"
 )
 def get_prediction_history(
     current_user: User = Depends(
@@ -405,7 +391,6 @@ def get_prediction_history(
     query = db.query(RiskPrediction)
 
     if current_user.role != "admin":
-
         query = (
             query
             .join(
@@ -419,7 +404,7 @@ def get_prediction_history(
             )
         )
 
-    return (
+    predictions = (
         query
         .order_by(
             RiskPrediction.created_at.desc(),
@@ -427,3 +412,21 @@ def get_prediction_history(
         )
         .all()
     )
+
+    return {
+        "status": "success",
+        "predictions": [
+            {
+                "patient_id": prediction.patient_id,
+                "risk": prediction.risk,
+                "confidence": prediction.confidence,
+                "probabilities": prediction.probabilities,
+                "created_at": (
+                    prediction.created_at.isoformat()
+                    if prediction.created_at
+                    else None
+                )
+            }
+            for prediction in predictions
+        ]
+    }

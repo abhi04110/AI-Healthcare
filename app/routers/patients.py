@@ -198,16 +198,10 @@ def create_health_record(
     record = HealthRecord(
         patient_id=patient.id,
         glucose=health_record_data.glucose,
-        blood_pressure=(
-            health_record_data.blood_pressure
-        ),
+        blood_pressure=health_record_data.blood_pressure,
         bmi=health_record_data.bmi,
-        cholesterol=(
-            health_record_data.cholesterol
-        ),
-        heart_rate=(
-            health_record_data.heart_rate
-        )
+        cholesterol=health_record_data.cholesterol,
+        heart_rate=health_record_data.heart_rate
     )
 
     db.add(record)
@@ -247,49 +241,12 @@ def get_health_records(
     )
 
 
-@router.get(
-    "/{patient_id}/health-records/{record_id}",
-    response_model=HealthRecordResponse
-)
-def get_health_record(
-    patient_id: int,
-    record_id: int,
-    current_user: User = Depends(
-        get_current_user
-    ),
-    db: Session = Depends(get_db)
-):
-    patient = get_patient_service(
-        patient_id=patient_id,
-        current_user=current_user,
-        db=db
-    )
-
-    record = (
-        db.query(HealthRecord)
-        .filter(
-            HealthRecord.id == record_id,
-            HealthRecord.patient_id == patient.id
-        )
-        .first()
-    )
-
-    if not record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Health record not found"
-        )
-
-    return record
-
-
 @router.put(
-    "/{patient_id}/health-records/{record_id}",
+    "/{patient_id}/health-records",
     response_model=HealthRecordResponse
 )
-def update_health_record(
+def update_latest_health_record(
     patient_id: int,
-    record_id: int,
     glucose: float | None = Form(None),
     blood_pressure: float | None = Form(None),
     bmi: float | None = Form(None),
@@ -309,8 +266,11 @@ def update_health_record(
     record = (
         db.query(HealthRecord)
         .filter(
-            HealthRecord.id == record_id,
             HealthRecord.patient_id == patient.id
+        )
+        .order_by(
+            HealthRecord.created_at.desc(),
+            HealthRecord.id.desc()
         )
         .first()
     )
@@ -318,7 +278,7 @@ def update_health_record(
     if not record:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Health record not found"
+            detail="No health record found for this patient"
         )
 
     health_record_data = HealthRecordUpdate(
@@ -347,11 +307,10 @@ def update_health_record(
 
 
 @router.delete(
-    "/{patient_id}/health-records/{record_id}"
+    "/{patient_id}/health-records"
 )
-def delete_health_record(
+def delete_latest_health_record(
     patient_id: int,
-    record_id: int,
     current_user: User = Depends(
         get_current_user
     ),
@@ -366,8 +325,11 @@ def delete_health_record(
     record = (
         db.query(HealthRecord)
         .filter(
-            HealthRecord.id == record_id,
             HealthRecord.patient_id == patient.id
+        )
+        .order_by(
+            HealthRecord.created_at.desc(),
+            HealthRecord.id.desc()
         )
         .first()
     )
@@ -375,14 +337,15 @@ def delete_health_record(
     if not record:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Health record not found"
+            detail="No health record found for this patient"
         )
 
     db.delete(record)
     db.commit()
 
     return {
-        "message": "Health record deleted successfully"
+        "message": "Latest health record deleted successfully",
+        "patient_id": patient.id
     }
 
 
@@ -452,7 +415,7 @@ def get_patient_timeline(
         },
         "health_records": [
             {
-                "id": record.id,
+                "patient_id": patient.id,
                 "glucose": record.glucose,
                 "blood_pressure": record.blood_pressure,
                 "bmi": record.bmi,
@@ -469,12 +432,10 @@ def get_patient_timeline(
         ],
         "medical_reports": [
             {
-                "id": report.id,
+                "patient_id": patient.id,
                 "file_name": report.file_name,
                 "file_type": report.file_type,
-                "extracted_text": (
-                    report.extracted_text
-                ),
+                "extracted_text": report.extracted_text,
                 "created_at": (
                     report.created_at.isoformat()
                     if report.created_at
@@ -485,15 +446,10 @@ def get_patient_timeline(
         ],
         "risk_predictions": [
             {
-                "id": prediction.id,
-                "health_record_id": (
-                    prediction.health_record_id
-                ),
+                "patient_id": patient.id,
                 "risk": prediction.risk,
                 "confidence": prediction.confidence,
-                "probabilities": (
-                    prediction.probabilities
-                ),
+                "probabilities": prediction.probabilities,
                 "created_at": (
                     prediction.created_at.isoformat()
                     if prediction.created_at
