@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 .env
 *.db
+# Database backups
+*.dump
+*.backup

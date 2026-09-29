@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from sqlalchemy import text
 
 from app.database import engine, Base
-from app import models
+from app import models, hms_models
 
 from app.routers import (
     auth,
@@ -12,29 +12,30 @@ from app.routers import (
     prediction,
     clustering,
     analytics,
-    assistant
+    assistant,
+    hms_departments,
+    hms_staff
 )
 
 
-Base.metadata.create_all(
-    bind=engine
-)
+Base.metadata.create_all(bind=engine)
 
 
 app = FastAPI(
-    title="AI Healthcare Risk & Patient Analytics System",
+    title="AI Healthcare & Hospital Management System",
     description="""
-    An intelligent healthcare system for:
+    Hospital Management System with:
 
-    - Authentication
+    - Authentication and role-based access
+    - Department Management
     - Patient Management
-    - Health Risk Prediction
-    - Medical Report OCR
+    - Medical Reports and OCR
+    - AI Health Risk Prediction
     - Patient Clustering
     - Healthcare Analytics
     - AI Healthcare Assistant
     """,
-    version="1.0.0"
+    version="2.0.0"
 )
 
 
@@ -46,12 +47,14 @@ app.include_router(prediction.router)
 app.include_router(clustering.router)
 app.include_router(analytics.router)
 app.include_router(assistant.router)
+app.include_router(hms_departments.router)
+app.include_router(hms_staff.router)
 
 
 @app.get("/")
 def home():
     return {
-        "message": "AI Healthcare Risk & Patient Analytics System is running successfully",
+        "message": "AI Healthcare and Hospital Management System is running",
         "status": "success"
     }
 
@@ -67,9 +70,7 @@ def health_check():
 def database_check():
     try:
         with engine.connect() as connection:
-            connection.execute(
-                text("SELECT 1")
-            )
+            connection.execute(text("SELECT 1"))
 
         return {
             "status": "success",
@@ -96,10 +97,7 @@ def get_tables():
                 """)
             )
 
-            tables = [
-                row[0]
-                for row in result
-            ]
+            tables = [row[0] for row in result]
 
         return {
             "status": "success",
