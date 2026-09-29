@@ -16,7 +16,7 @@ from app.schemas import (
     PatientCreate,
     PatientUpdate
 )
-
+from app.hms_models import PatientDoctorAssignment
 
 def create_patient_service(
     patient_data: PatientCreate,
@@ -60,10 +60,24 @@ def get_patients_service(
     current_user: User,
     db: Session
 ):
-    query = db.query(Patient)
+    if current_user.role == "admin":
+        query = db.query(Patient)
 
-    if current_user.role != "admin":
-        query = query.filter(
+    elif current_user.role == "doctor":
+        query = (
+            db.query(Patient)
+            .join(
+                PatientDoctorAssignment,
+                PatientDoctorAssignment.patient_id == Patient.id
+            )
+            .filter(
+                PatientDoctorAssignment.doctor_user_id == current_user.id,
+                PatientDoctorAssignment.is_active.is_(True)
+            )
+        )
+
+    else:
+        query = db.query(Patient).filter(
             Patient.created_by == current_user.id
         )
 
@@ -84,9 +98,7 @@ def get_patient_service(
 ):
     patient = (
         db.query(Patient)
-        .filter(
-            Patient.id == patient_id
-        )
+        .filter(Patient.id == patient_id)
         .first()
     )
 
@@ -96,16 +108,32 @@ def get_patient_service(
             detail="Patient not found"
         )
 
-    if (
-        current_user.role != "admin"
-        and patient.created_by != current_user.id
-    ):
+    if current_user.role == "admin":
+        return patient
+
+    if current_user.role == "doctor":
+        assignment = (
+            db.query(PatientDoctorAssignment)
+            .filter(
+                PatientDoctorAssignment.patient_id == patient_id,
+                PatientDoctorAssignment.doctor_user_id == current_user.id,
+                PatientDoctorAssignment.is_active.is_(True)
+            )
+            .first()
+        )
+
+        if not assignment:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not assigned to this patient"
+            )
+
+        return patient
+
+    if patient.created_by != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "You do not have access "
-                "to this patient"
-            )
+            detail="You do not have access to this patient"
         )
 
     return patient
