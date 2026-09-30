@@ -5,10 +5,174 @@ from datetime import datetime, timezone
 from app.database import Base
 
 
+class Department(Base):
+    __tablename__ = "departments"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    name = Column(
+        String(100),
+        unique=True,
+        nullable=False
+    )
+
+    code = Column(
+        String(50),
+        unique=True,
+        nullable=False
+    )
+
+    description = Column(
+        Text,
+        nullable=True
+    )
+
+    is_active = Column(
+        Boolean,
+        default=True,
+        nullable=False
+    )
+
+    created_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+
+class StaffProfile(Base):
+    __tablename__ = "staff_profiles"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        unique=True,
+        nullable=False
+    )
+
+    department_id = Column(
+        Integer,
+        ForeignKey("departments.id"),
+        nullable=False
+    )
+
+    employee_code = Column(
+        String(50),
+        unique=True,
+        nullable=False
+    )
+
+    designation = Column(
+        String(100),
+        nullable=True
+    )
+
+    qualification = Column(
+        String(200),
+        nullable=True
+    )
+
+    specialty = Column(
+        String(200),
+        nullable=True
+    )
+
+    shift_start = Column(
+        String(10),
+        nullable=True
+    )
+
+    shift_end = Column(
+        String(10),
+        nullable=True
+    )
+
+    is_active = Column(
+        Boolean,
+        default=True,
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+
+class PatientDoctorAssignment(Base):
+    __tablename__ = "patient_doctor_assignments"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    patient_id = Column(
+        Integer,
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    doctor_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    assigned_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    is_active = Column(
+        Boolean,
+        default=True,
+        nullable=False
+    )
+
+    assigned_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    unassigned_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "patient_id",
+            "doctor_user_id",
+            name="uq_patient_doctor_assignment"
+        ),
+    )
+
+
 class Appointment(Base):
     __tablename__ = "appointments"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
     patient_id = Column(
         Integer,
@@ -30,9 +194,16 @@ class Appointment(Base):
         nullable=True
     )
 
-    appointment_date = Column(DateTime(timezone=True), nullable=False, index=True)
+    appointment_date = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True
+    )
 
-    reason = Column(Text, nullable=True)
+    reason = Column(
+        Text,
+        nullable=True
+    )
 
     status = Column(
         String(20),
@@ -40,9 +211,16 @@ class Appointment(Base):
         default="scheduled"
     )
 
-    notes = Column(Text, nullable=True)
+    notes = Column(
+        Text,
+        nullable=True
+    )
 
-    is_active = Column(Boolean, default=True, nullable=False)
+    is_active = Column(
+        Boolean,
+        default=True,
+        nullable=False
+    )
 
     created_at = Column(
         DateTime(timezone=True),
@@ -57,7 +235,9 @@ class Appointment(Base):
         nullable=False
     )
 
-    patient = relationship("Patient")
+    patient = relationship(
+        "Patient"
+    )
 
     doctor = relationship(
         "User",
