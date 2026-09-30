@@ -1,181 +1,78 @@
-from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    Boolean,
-    DateTime,
-    ForeignKey,
-    Text,
-    UniqueConstraint
-)
-from sqlalchemy.sql import func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, UniqueConstraint
+from sqlalchemy.orm import relationship
+from datetime import datetime, timezone
 
 from app.database import Base
 
 
-class Department(Base):
-    __tablename__ = "departments"
+class Appointment(Base):
+    __tablename__ = "appointments"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
-
-    name = Column(
-        String(100),
-        unique=True,
-        nullable=False,
-        index=True
-    )
-
-    code = Column(
-        String(30),
-        unique=True,
-        nullable=False,
-        index=True
-    )
-
-    description = Column(
-        Text,
-        nullable=True
-    )
-
-    is_active = Column(
-        Boolean,
-        nullable=False,
-        default=True
-    )
-
-    created_by_user_id = Column(
-        Integer,
-        ForeignKey("users.id"),
-        nullable=True
-    )
-
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now()
-    )
-
-
-class StaffProfile(Base):
-    __tablename__ = "staff_profiles"
-
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
-
-    user_id = Column(
-        Integer,
-        ForeignKey("users.id"),
-        unique=True,
-        nullable=False,
-        index=True
-    )
-
-    department_id = Column(
-        Integer,
-        ForeignKey("departments.id"),
-        nullable=False,
-        index=True
-    )
-
-    employee_code = Column(
-        String(50),
-        unique=True,
-        nullable=False,
-        index=True
-    )
-
-    designation = Column(
-        String(100),
-        nullable=False
-    )
-
-    qualification = Column(
-        String(200),
-        nullable=True
-    )
-
-    specialty = Column(
-        String(150),
-        nullable=True
-    )
-
-    shift_start = Column(
-        String(10),
-        nullable=True
-    )
-
-    shift_end = Column(
-        String(10),
-        nullable=True
-    )
-
-    is_active = Column(
-        Boolean,
-        nullable=False,
-        default=True
-    )
-
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now()
-    )
-
-
-class PatientDoctorAssignment(Base):
-    __tablename__ = "patient_doctor_assignments"
-
-    __table_args__ = (
-        UniqueConstraint(
-            "patient_id",
-            "doctor_user_id",
-            name="uq_patient_doctor_assignment"
-        ),
-    )
-
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
     patient_id = Column(
         Integer,
-        ForeignKey("patients.id"),
+        ForeignKey("patients.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
 
     doctor_user_id = Column(
         Integer,
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
 
-    assigned_by_user_id = Column(
+    created_by_user_id = Column(
         Integer,
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
+    )
+
+    appointment_date = Column(DateTime(timezone=True), nullable=False, index=True)
+
+    reason = Column(Text, nullable=True)
+
+    status = Column(
+        String(20),
+        nullable=False,
+        default="scheduled"
+    )
+
+    notes = Column(Text, nullable=True)
+
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
 
-    is_active = Column(
-        Boolean,
-        nullable=False,
-        default=True
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
     )
 
-    assigned_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now()
+    patient = relationship("Patient")
+
+    doctor = relationship(
+        "User",
+        foreign_keys=[doctor_user_id]
     )
 
-    unassigned_at = Column(
-        DateTime(timezone=True),
-        nullable=True
+    created_by = relationship(
+        "User",
+        foreign_keys=[created_by_user_id]
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "doctor_user_id",
+            "appointment_date",
+            name="uq_doctor_appointment_datetime"
+        ),
     )

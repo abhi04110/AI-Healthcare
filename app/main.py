@@ -15,7 +15,8 @@ from app.routers import (
     assistant,
     hms_departments,
     hms_staff,
-    hms_assignments
+    hms_assignments,
+    hms_appointments
 )
 
 
@@ -51,6 +52,7 @@ app.include_router(assistant.router)
 app.include_router(hms_departments.router)
 app.include_router(hms_staff.router)
 app.include_router(hms_assignments.router)
+app.include_router(hms_appointments.router)
 
 @app.get("/")
 def home():
