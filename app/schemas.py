@@ -9,23 +9,10 @@ from pydantic import (
 
 
 class UserRegister(BaseModel):
-    name: str = Field(
-        ...,
-        min_length=2,
-        max_length=100
-    )
-
+    name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
-
-    password: str = Field(
-        ...,
-        min_length=6,
-        max_length=100
-    )
-
-    role: str = Field(
-        default="doctor"
-    )
+    password: str = Field(..., min_length=6, max_length=100)
+    role: str = Field(default="doctor")
 
     @field_validator("name")
     @classmethod
@@ -33,9 +20,7 @@ class UserRegister(BaseModel):
         value = value.strip()
 
         if not value:
-            raise ValueError(
-                "Name cannot be empty"
-            )
+            raise ValueError("Name cannot be empty")
 
         return value
 
@@ -74,37 +59,12 @@ class UserResponse(BaseModel):
 
 
 class PatientCreate(BaseModel):
-    patient_code: str = Field(
-        ...,
-        min_length=2,
-        max_length=50
-    )
-
-    name: str = Field(
-        ...,
-        min_length=2,
-        max_length=100
-    )
-
-    age: int = Field(
-        ...,
-        ge=0,
-        le=120
-    )
-
-    gender: str = Field(
-        ...,
-        min_length=1,
-        max_length=20
-    )
-
-    phone: str | None = Field(
-        default=None,
-        max_length=20
-    )
-
+    patient_code: str = Field(..., min_length=2, max_length=50)
+    name: str = Field(..., min_length=2, max_length=100)
+    age: int = Field(..., ge=0, le=120)
+    gender: str = Field(..., min_length=1, max_length=20)
+    phone: str | None = Field(default=None, max_length=20)
     address: str | None = None
-
     medical_history: str | None = None
 
 
@@ -133,7 +93,6 @@ class PatientUpdate(BaseModel):
     )
 
     address: str | None = None
-
     medical_history: str | None = None
 
 
@@ -153,57 +112,19 @@ class PatientResponse(BaseModel):
 
 
 class HealthRecordCreate(BaseModel):
-    glucose: float | None = Field(
-        default=None,
-        ge=0
-    )
-
-    blood_pressure: float | None = Field(
-        default=None,
-        ge=0
-    )
-
-    bmi: float | None = Field(
-        default=None,
-        ge=0
-    )
-
-    cholesterol: float | None = Field(
-        default=None,
-        ge=0
-    )
-
-    heart_rate: float | None = Field(
-        default=None,
-        ge=0
-    )
+    glucose: float | None = Field(default=None, ge=0)
+    blood_pressure: float | None = Field(default=None, ge=0)
+    bmi: float | None = Field(default=None, ge=0)
+    cholesterol: float | None = Field(default=None, ge=0)
+    heart_rate: float | None = Field(default=None, ge=0)
 
 
 class HealthRecordUpdate(BaseModel):
-    glucose: float | None = Field(
-        default=None,
-        ge=0
-    )
-
-    blood_pressure: float | None = Field(
-        default=None,
-        ge=0
-    )
-
-    bmi: float | None = Field(
-        default=None,
-        ge=0
-    )
-
-    cholesterol: float | None = Field(
-        default=None,
-        ge=0
-    )
-
-    heart_rate: float | None = Field(
-        default=None,
-        ge=0
-    )
+    glucose: float | None = Field(default=None, ge=0)
+    blood_pressure: float | None = Field(default=None, ge=0)
+    bmi: float | None = Field(default=None, ge=0)
+    cholesterol: float | None = Field(default=None, ge=0)
+    heart_rate: float | None = Field(default=None, ge=0)
 
 
 class HealthRecordResponse(BaseModel):
@@ -296,7 +217,8 @@ class ConsultationResponse(BaseModel):
 
     class Config:
         from_attributes = True
-        
+
+
 class PrescriptionCreate(BaseModel):
     consultation_id: int
     medicine_name: str = Field(
@@ -333,6 +255,97 @@ class PrescriptionResponse(BaseModel):
     duration: str
     instructions: str | None
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LabOrderCreate(BaseModel):
+    patient_id: int
+
+    test_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=200
+    )
+
+    test_type: str | None = Field(
+        default=None,
+        max_length=100
+    )
+
+    priority: str = Field(
+        default="normal",
+        max_length=30
+    )
+
+    clinical_notes: str | None = None
+
+
+class LabOrderStatusUpdate(BaseModel):
+    status: str = Field(
+        ...,
+        min_length=2,
+        max_length=30
+    )
+
+
+class LabOrderResponse(BaseModel):
+    id: int
+    patient_id: int
+    doctor_user_id: int
+    test_name: str
+    test_type: str | None
+    priority: str
+    clinical_notes: str | None
+    status: str
+    ordered_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LabResultCreate(BaseModel):
+    lab_order_id: int
+
+    result_value: str = Field(
+        ...,
+        min_length=1
+    )
+
+    unit: str | None = Field(
+        default=None,
+        max_length=50
+    )
+
+    reference_range: str | None = Field(
+        default=None,
+        max_length=100
+    )
+
+    interpretation: str | None = None
+
+    result_status: str = Field(
+        default="normal",
+        max_length=30
+    )
+
+    remarks: str | None = None
+
+
+class LabResultResponse(BaseModel):
+    id: int
+    lab_order_id: int
+    patient_id: int
+    technician_user_id: int
+    result_value: str
+    unit: str | None
+    reference_range: str | None
+    interpretation: str | None
+    result_status: str
+    remarks: str | None
+    completed_at: datetime
 
     class Config:
         from_attributes = True

@@ -244,9 +244,7 @@ class Appointment(Base):
         nullable=False
     )
 
-    patient = relationship(
-        "Patient"
-    )
+    patient = relationship("Patient")
 
     doctor = relationship(
         "User",
@@ -335,19 +333,16 @@ class Consultation(Base):
         nullable=False
     )
 
-    appointment = relationship(
-        "Appointment"
-    )
+    appointment = relationship("Appointment")
 
-    patient = relationship(
-        "Patient"
-    )
+    patient = relationship("Patient")
 
     doctor = relationship(
         "User",
         foreign_keys=[doctor_user_id]
     )
-    
+
+
 class Prescription(Base):
     __tablename__ = "prescriptions"
 
@@ -409,15 +404,158 @@ class Prescription(Base):
         nullable=False
     )
 
-    consultation = relationship(
-        "Consultation"
-    )
+    consultation = relationship("Consultation")
 
-    patient = relationship(
-        "Patient"
-    )
+    patient = relationship("Patient")
 
     doctor = relationship(
         "User",
         foreign_keys=[doctor_user_id]
+    )
+
+
+class LabOrder(Base):
+    __tablename__ = "lab_orders"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    patient_id = Column(
+        Integer,
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    doctor_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    test_name = Column(
+        String(200),
+        nullable=False
+    )
+
+    test_type = Column(
+        String(100),
+        nullable=True
+    )
+
+    priority = Column(
+        String(30),
+        nullable=False,
+        default="normal"
+    )
+
+    clinical_notes = Column(
+        Text,
+        nullable=True
+    )
+
+    status = Column(
+        String(30),
+        nullable=False,
+        default="ordered"
+    )
+
+    ordered_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    patient = relationship("Patient")
+
+    doctor = relationship(
+        "User",
+        foreign_keys=[doctor_user_id]
+    )
+
+
+class LabResult(Base):
+    __tablename__ = "lab_results"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    lab_order_id = Column(
+        Integer,
+        ForeignKey("lab_orders.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True
+    )
+
+    patient_id = Column(
+        Integer,
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    technician_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    result_value = Column(
+        Text,
+        nullable=False
+    )
+
+    unit = Column(
+        String(50),
+        nullable=True
+    )
+
+    reference_range = Column(
+        String(100),
+        nullable=True
+    )
+
+    interpretation = Column(
+        Text,
+        nullable=True
+    )
+
+    result_status = Column(
+        String(30),
+        nullable=False,
+        default="normal"
+    )
+
+    remarks = Column(
+        Text,
+        nullable=True
+    )
+
+    completed_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    lab_order = relationship("LabOrder")
+
+    patient = relationship("Patient")
+
+    technician = relationship(
+        "User",
+        foreign_keys=[technician_user_id]
     )

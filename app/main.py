@@ -18,7 +18,8 @@ from app.routers import (
     hms_assignments,
     hms_appointments,
     hms_consultations,
-    hms_prescriptions
+    hms_prescriptions,
+    hms_labs
 )
 
 
@@ -57,6 +58,7 @@ app.include_router(hms_assignments.router)
 app.include_router(hms_appointments.router)
 app.include_router(hms_consultations.router)
 app.include_router(hms_prescriptions.router)
+app.include_router(hms_labs.router)
 
 @app.get("/")
 def home():
