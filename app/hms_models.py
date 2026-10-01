@@ -1,4 +1,13 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    DateTime,
+    ForeignKey,
+    Text,
+    Boolean,
+    UniqueConstraint
+)
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 
@@ -255,4 +264,160 @@ class Appointment(Base):
             "appointment_date",
             name="uq_doctor_appointment_datetime"
         ),
+    )
+
+
+class Consultation(Base):
+    __tablename__ = "consultations"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    appointment_id = Column(
+        Integer,
+        ForeignKey("appointments.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True
+    )
+
+    patient_id = Column(
+        Integer,
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    doctor_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    symptoms = Column(
+        Text,
+        nullable=True
+    )
+
+    diagnosis = Column(
+        Text,
+        nullable=True
+    )
+
+    treatment_plan = Column(
+        Text,
+        nullable=True
+    )
+
+    follow_up_date = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    notes = Column(
+        Text,
+        nullable=True
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    appointment = relationship(
+        "Appointment"
+    )
+
+    patient = relationship(
+        "Patient"
+    )
+
+    doctor = relationship(
+        "User",
+        foreign_keys=[doctor_user_id]
+    )
+    
+class Prescription(Base):
+    __tablename__ = "prescriptions"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    consultation_id = Column(
+        Integer,
+        ForeignKey("consultations.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True
+    )
+
+    patient_id = Column(
+        Integer,
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    doctor_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    medicine_name = Column(
+        String(200),
+        nullable=False
+    )
+
+    dosage = Column(
+        String(100),
+        nullable=False
+    )
+
+    frequency = Column(
+        String(100),
+        nullable=False
+    )
+
+    duration = Column(
+        String(100),
+        nullable=False
+    )
+
+    instructions = Column(
+        Text,
+        nullable=True
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    consultation = relationship(
+        "Consultation"
+    )
+
+    patient = relationship(
+        "Patient"
+    )
+
+    doctor = relationship(
+        "User",
+        foreign_keys=[doctor_user_id]
     )

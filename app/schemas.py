@@ -240,7 +240,8 @@ class RiskPredictionResponse(BaseModel):
 
     class Config:
         from_attributes = True
-        
+
+
 class AppointmentCreate(BaseModel):
     patient_id: int
     doctor_user_id: int
@@ -266,6 +267,72 @@ class AppointmentResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ConsultationCreate(BaseModel):
+    appointment_id: int
+    symptoms: str | None = None
+    diagnosis: str | None = None
+    treatment_plan: str | None = None
+    follow_up_date: datetime | None = None
+    notes: str | None = None
+
+
+class ConsultationResponse(BaseModel):
+    id: int
+    appointment_id: int
+    patient_id: int
+    doctor_user_id: int
+    symptoms: str | None
+    diagnosis: str | None
+    treatment_plan: str | None
+    follow_up_date: datetime | None
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+        
+class PrescriptionCreate(BaseModel):
+    consultation_id: int
+    medicine_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=200
+    )
+    dosage: str = Field(
+        ...,
+        min_length=1,
+        max_length=100
+    )
+    frequency: str = Field(
+        ...,
+        min_length=1,
+        max_length=100
+    )
+    duration: str = Field(
+        ...,
+        min_length=1,
+        max_length=100
+    )
+    instructions: str | None = None
+
+
+class PrescriptionResponse(BaseModel):
+    id: int
+    consultation_id: int
+    patient_id: int
+    doctor_user_id: int
+    medicine_name: str
+    dosage: str
+    frequency: str
+    duration: str
+    instructions: str | None
+    created_at: datetime
 
     class Config:
         from_attributes = True
