@@ -634,3 +634,237 @@ class MedicineDispensing(Base):
         "User",
         foreign_keys=[pharmacist_user_id]
     )
+
+
+class Bill(Base):
+    __tablename__ = "bills"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    patient_id = Column(
+        Integer,
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    created_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
+    )
+
+    bill_number = Column(
+        String(100),
+        unique=True,
+        nullable=False,
+        index=True
+    )
+
+    subtotal = Column(
+        Float,
+        nullable=False,
+        default=0
+    )
+
+    discount = Column(
+        Float,
+        nullable=False,
+        default=0
+    )
+
+    tax = Column(
+        Float,
+        nullable=False,
+        default=0
+    )
+
+    total_amount = Column(
+        Float,
+        nullable=False,
+        default=0
+    )
+
+    paid_amount = Column(
+        Float,
+        nullable=False,
+        default=0
+    )
+
+    payment_status = Column(
+        String(30),
+        nullable=False,
+        default="pending"
+    )
+
+    notes = Column(
+        Text,
+        nullable=True
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    patient = relationship("Patient")
+
+    created_by = relationship(
+        "User",
+        foreign_keys=[created_by_user_id]
+    )
+
+    items = relationship(
+        "BillItem",
+        back_populates="bill",
+        cascade="all, delete-orphan"
+    )
+
+
+class BillItem(Base):
+    __tablename__ = "bill_items"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    bill_id = Column(
+        Integer,
+        ForeignKey("bills.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    item_type = Column(
+        String(50),
+        nullable=False
+    )
+
+    description = Column(
+        String(300),
+        nullable=False
+    )
+
+    quantity = Column(
+        Integer,
+        nullable=False,
+        default=1
+    )
+
+    unit_price = Column(
+        Float,
+        nullable=False,
+        default=0
+    )
+
+    total_price = Column(
+        Float,
+        nullable=False,
+        default=0
+    )
+
+    bill = relationship(
+        "Bill",
+        back_populates="items"
+    )
+    
+class EmergencyCase(Base):
+    __tablename__ = "emergency_cases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    assigned_doctor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    assigned_nurse_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    priority = Column(String(30), nullable=False, default="normal")
+    symptoms = Column(Text, nullable=True)
+    vitals = Column(Text, nullable=True)
+    treatment_notes = Column(Text, nullable=True)
+
+    status = Column(String(30), nullable=False, default="waiting")
+    admission_required = Column(Boolean, default=False)
+
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+    
+class ICUAdmission(Base):
+    __tablename__ = "icu_admissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+
+    doctor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    nurse_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    bed_number = Column(String(50), nullable=False)
+    room_number = Column(String(50), nullable=True)
+
+    admission_reason = Column(Text, nullable=False)
+    vitals = Column(Text, nullable=True)
+    treatment_notes = Column(Text, nullable=True)
+
+    status = Column(String(30), nullable=False, default="admitted")
+
+    admitted_at = Column(DateTime, default=datetime.utcnow)
+    discharged_at = Column(DateTime, nullable=True)
+
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+    
+class OperationTheatreCase(Base):
+    __tablename__ = "operation_theatre_cases"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+
+    surgeon_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    assistant_doctor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    nurse_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    operation_name = Column(String(200), nullable=False)
+    operation_type = Column(String(100), nullable=True)
+
+    theatre_number = Column(String(50), nullable=False)
+    scheduled_at = Column(DateTime, nullable=False)
+
+    diagnosis = Column(Text, nullable=True)
+    pre_op_notes = Column(Text, nullable=True)
+    post_op_notes = Column(Text, nullable=True)
+
+    status = Column(String(30), nullable=False, default="scheduled")
+
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
