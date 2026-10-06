@@ -509,3 +509,121 @@ class OTCaseResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        
+class HousekeepingTaskCreate(BaseModel):
+    task_type: str = Field(
+        ...,
+        min_length=2,
+        max_length=100
+    )
+
+    area: str = Field(
+        ...,
+        min_length=2,
+        max_length=200
+    )
+
+    room_number: str | None = Field(
+        default=None,
+        max_length=50
+    )
+
+    priority: str = Field(
+        default="normal",
+        max_length=30
+    )
+
+    assigned_worker_id: int | None = Field(
+        default=None,
+        gt=0
+    )
+
+    description: str | None = None
+
+
+class HousekeepingStatusUpdate(BaseModel):
+    status: str = Field(
+        ...,
+        max_length=30
+    )
+
+    description: str | None = None
+
+
+class HousekeepingTaskResponse(BaseModel):
+    id: int
+
+    task_type: str
+    area: str
+    room_number: str | None
+
+    priority: str
+
+    assigned_worker_id: int | None
+
+    description: str | None
+
+    status: str
+
+    started_at: datetime | None
+    completed_at: datetime | None
+
+    created_by_user_id: int
+
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+        
+class CanteenMenuItemCreate(BaseModel):
+    item_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=200
+    )
+
+    category: str | None = Field(
+        default=None,
+        max_length=100
+    )
+
+    description: str | None = None
+
+    price: float = Field(
+        ...,
+        ge=0
+    )
+
+    available_quantity: int = Field(
+        default=0,
+        ge=0
+    )
+
+
+class CanteenOrderCreate(BaseModel):
+    patient_id: int | None = Field(
+        default=None,
+        gt=0
+    )
+
+    menu_item_id: int = Field(
+        ...,
+        gt=0
+    )
+
+    quantity: int = Field(
+        ...,
+        gt=0
+    )
+
+    notes: str | None = None
+
+
+class CanteenStatusUpdate(BaseModel):
+    status: str = Field(
+        ...,
+        max_length=30
+    )
+
+    notes: str | None = None

@@ -868,3 +868,127 @@ class OperationTheatreCase(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
+    
+class HousekeepingTask(Base):
+    __tablename__ = "housekeeping_tasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    task_type = Column(String(100), nullable=False)
+    area = Column(String(200), nullable=False)
+    room_number = Column(String(50), nullable=True)
+
+    priority = Column(String(30), nullable=False, default="normal")
+
+    assigned_worker_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True
+    )
+
+    description = Column(Text, nullable=True)
+
+    status = Column(
+        String(30),
+        nullable=False,
+        default="pending"
+    )
+
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    created_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+    
+class CanteenMenuItem(Base):
+    __tablename__ = "canteen_menu_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    item_name = Column(String(200), nullable=False)
+    category = Column(String(100), nullable=True)
+    description = Column(Text, nullable=True)
+
+    price = Column(Float, nullable=False)
+    available_quantity = Column(Integer, nullable=False, default=0)
+
+    is_available = Column(Boolean, nullable=False, default=True)
+
+    created_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
+
+
+class CanteenOrder(Base):
+    __tablename__ = "canteen_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    patient_id = Column(
+        Integer,
+        ForeignKey("patients.id"),
+        nullable=True
+    )
+
+    ordered_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    menu_item_id = Column(
+        Integer,
+        ForeignKey("canteen_menu_items.id"),
+        nullable=False
+    )
+
+    quantity = Column(Integer, nullable=False, default=1)
+
+    unit_price = Column(Float, nullable=False)
+    total_amount = Column(Float, nullable=False)
+
+    status = Column(
+        String(30),
+        nullable=False,
+        default="pending"
+    )
+
+    notes = Column(Text, nullable=True)
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow
+    )
