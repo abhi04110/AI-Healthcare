@@ -6,6 +6,7 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     Boolean,
+    Float,
     UniqueConstraint
 )
 from sqlalchemy.orm import relationship
@@ -58,11 +59,7 @@ class Department(Base):
 class StaffProfile(Base):
     __tablename__ = "staff_profiles"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
     user_id = Column(
         Integer,
@@ -83,30 +80,12 @@ class StaffProfile(Base):
         nullable=False
     )
 
-    designation = Column(
-        String(100),
-        nullable=True
-    )
+    designation = Column(String(100), nullable=True)
+    qualification = Column(String(200), nullable=True)
+    specialty = Column(String(200), nullable=True)
 
-    qualification = Column(
-        String(200),
-        nullable=True
-    )
-
-    specialty = Column(
-        String(200),
-        nullable=True
-    )
-
-    shift_start = Column(
-        String(10),
-        nullable=True
-    )
-
-    shift_end = Column(
-        String(10),
-        nullable=True
-    )
+    shift_start = Column(String(10), nullable=True)
+    shift_end = Column(String(10), nullable=True)
 
     is_active = Column(
         Boolean,
@@ -124,11 +103,7 @@ class StaffProfile(Base):
 class PatientDoctorAssignment(Base):
     __tablename__ = "patient_doctor_assignments"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
     patient_id = Column(
         Integer,
@@ -177,11 +152,7 @@ class PatientDoctorAssignment(Base):
 class Appointment(Base):
     __tablename__ = "appointments"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
     patient_id = Column(
         Integer,
@@ -209,10 +180,7 @@ class Appointment(Base):
         index=True
     )
 
-    reason = Column(
-        Text,
-        nullable=True
-    )
+    reason = Column(Text, nullable=True)
 
     status = Column(
         String(20),
@@ -220,10 +188,7 @@ class Appointment(Base):
         default="scheduled"
     )
 
-    notes = Column(
-        Text,
-        nullable=True
-    )
+    notes = Column(Text, nullable=True)
 
     is_active = Column(
         Boolean,
@@ -268,11 +233,7 @@ class Appointment(Base):
 class Consultation(Base):
     __tablename__ = "consultations"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
     appointment_id = Column(
         Integer,
@@ -295,30 +256,16 @@ class Consultation(Base):
         index=True
     )
 
-    symptoms = Column(
-        Text,
-        nullable=True
-    )
-
-    diagnosis = Column(
-        Text,
-        nullable=True
-    )
-
-    treatment_plan = Column(
-        Text,
-        nullable=True
-    )
+    symptoms = Column(Text, nullable=True)
+    diagnosis = Column(Text, nullable=True)
+    treatment_plan = Column(Text, nullable=True)
 
     follow_up_date = Column(
         DateTime(timezone=True),
         nullable=True
     )
 
-    notes = Column(
-        Text,
-        nullable=True
-    )
+    notes = Column(Text, nullable=True)
 
     created_at = Column(
         DateTime(timezone=True),
@@ -334,7 +281,6 @@ class Consultation(Base):
     )
 
     appointment = relationship("Appointment")
-
     patient = relationship("Patient")
 
     doctor = relationship(
@@ -346,11 +292,7 @@ class Consultation(Base):
 class Prescription(Base):
     __tablename__ = "prescriptions"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
     consultation_id = Column(
         Integer,
@@ -405,7 +347,6 @@ class Prescription(Base):
     )
 
     consultation = relationship("Consultation")
-
     patient = relationship("Patient")
 
     doctor = relationship(
@@ -417,11 +358,7 @@ class Prescription(Base):
 class LabOrder(Base):
     __tablename__ = "lab_orders"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
     patient_id = Column(
         Integer,
@@ -488,11 +425,7 @@ class LabOrder(Base):
 class LabResult(Base):
     __tablename__ = "lab_results"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
     lab_order_id = Column(
         Integer,
@@ -552,10 +485,152 @@ class LabResult(Base):
     )
 
     lab_order = relationship("LabOrder")
-
     patient = relationship("Patient")
 
     technician = relationship(
         "User",
         foreign_keys=[technician_user_id]
+    )
+
+
+class Medicine(Base):
+    __tablename__ = "medicines"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    medicine_name = Column(
+        String(200),
+        nullable=False,
+        index=True
+    )
+
+    generic_name = Column(
+        String(200),
+        nullable=True
+    )
+
+    category = Column(
+        String(100),
+        nullable=True
+    )
+
+    manufacturer = Column(
+        String(200),
+        nullable=True
+    )
+
+    batch_number = Column(
+        String(100),
+        nullable=False,
+        unique=True
+    )
+
+    quantity = Column(
+        Integer,
+        nullable=False,
+        default=0
+    )
+
+    unit_price = Column(
+        Float,
+        nullable=False,
+        default=0
+    )
+
+    expiry_date = Column(
+        DateTime(timezone=True),
+        nullable=False
+    )
+
+    is_active = Column(
+        Boolean,
+        default=True,
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+
+class MedicineDispensing(Base):
+    __tablename__ = "medicine_dispensings"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    prescription_id = Column(
+        Integer,
+        ForeignKey("prescriptions.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    patient_id = Column(
+        Integer,
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    medicine_id = Column(
+        Integer,
+        ForeignKey("medicines.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    pharmacist_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False
+    )
+
+    quantity = Column(
+        Integer,
+        nullable=False
+    )
+
+    unit_price = Column(
+        Float,
+        nullable=False
+    )
+
+    total_price = Column(
+        Float,
+        nullable=False
+    )
+
+    dispensed_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+
+    notes = Column(
+        Text,
+        nullable=True
+    )
+
+    prescription = relationship("Prescription")
+    patient = relationship("Patient")
+    medicine = relationship("Medicine")
+
+    pharmacist = relationship(
+        "User",
+        foreign_keys=[pharmacist_user_id]
     )

@@ -69,29 +69,10 @@ class PatientCreate(BaseModel):
 
 
 class PatientUpdate(BaseModel):
-    name: str | None = Field(
-        default=None,
-        min_length=2,
-        max_length=100
-    )
-
-    age: int | None = Field(
-        default=None,
-        ge=0,
-        le=120
-    )
-
-    gender: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=20
-    )
-
-    phone: str | None = Field(
-        default=None,
-        max_length=20
-    )
-
+    name: str | None = Field(default=None, min_length=2, max_length=100)
+    age: int | None = Field(default=None, ge=0, le=120)
+    gender: str | None = Field(default=None, min_length=1, max_length=20)
+    phone: str | None = Field(default=None, max_length=20)
     address: str | None = None
     medical_history: str | None = None
 
@@ -221,26 +202,31 @@ class ConsultationResponse(BaseModel):
 
 class PrescriptionCreate(BaseModel):
     consultation_id: int
+
     medicine_name: str = Field(
         ...,
         min_length=2,
         max_length=200
     )
+
     dosage: str = Field(
         ...,
         min_length=1,
         max_length=100
     )
+
     frequency: str = Field(
         ...,
         min_length=1,
         max_length=100
     )
+
     duration: str = Field(
         ...,
         min_length=1,
         max_length=100
     )
+
     instructions: str | None = None
 
 
@@ -346,6 +332,98 @@ class LabResultResponse(BaseModel):
     result_status: str
     remarks: str | None
     completed_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MedicineCreate(BaseModel):
+    medicine_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=200
+    )
+
+    generic_name: str | None = Field(
+        default=None,
+        max_length=200
+    )
+
+    category: str | None = Field(
+        default=None,
+        max_length=100
+    )
+
+    manufacturer: str | None = Field(
+        default=None,
+        max_length=200
+    )
+
+    batch_number: str = Field(
+        ...,
+        min_length=2,
+        max_length=100
+    )
+
+    quantity: int = Field(
+        default=0,
+        ge=0
+    )
+
+    unit_price: float = Field(
+        default=0,
+        ge=0
+    )
+
+    expiry_date: datetime
+
+
+class MedicineStockUpdate(BaseModel):
+    quantity: int = Field(
+        ...,
+        ge=0
+    )
+
+
+class MedicineResponse(BaseModel):
+    id: int
+    medicine_name: str
+    generic_name: str | None
+    category: str | None
+    manufacturer: str | None
+    batch_number: str
+    quantity: int
+    unit_price: float
+    expiry_date: datetime
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MedicineDispenseCreate(BaseModel):
+    prescription_id: int
+    medicine_id: int
+    quantity: int = Field(
+        ...,
+        gt=0
+    )
+    notes: str | None = None
+
+
+class MedicineDispenseResponse(BaseModel):
+    id: int
+    prescription_id: int
+    patient_id: int
+    medicine_id: int
+    pharmacist_user_id: int
+    quantity: int
+    unit_price: float
+    total_price: float
+    dispensed_at: datetime
+    notes: str | None
 
     class Config:
         from_attributes = True
