@@ -1,0 +1,1 @@
+from app.routers.hms_dashboard import router as hms_dashboard_router

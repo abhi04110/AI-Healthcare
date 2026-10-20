@@ -54,6 +54,7 @@ class User(Base):
 
     patients = relationship(
         "Patient",
+        foreign_keys="Patient.created_by",
         back_populates="created_by_user"
     )
 
@@ -111,6 +112,13 @@ class Patient(Base):
         nullable=True
     )
 
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now()
@@ -118,7 +126,14 @@ class Patient(Base):
 
     created_by_user = relationship(
         "User",
+        foreign_keys=[created_by],
         back_populates="patients"
+    )
+
+    patient_user = relationship(
+        "User",
+        foreign_keys=[user_id],
+        uselist=False
     )
 
     health_records = relationship(

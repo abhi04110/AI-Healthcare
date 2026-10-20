@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from sqlalchemy.orm import Session
 
 from app.models import Patient, HealthRecord
+from app.services.access_service import get_accessible_patient_query
 
 
 FEATURES = [
@@ -26,14 +27,13 @@ def get_latest_patient_records(
     db: Session,
     current_user
 ):
-    patient_query = db.query(Patient)
-
-    if current_user.role != "admin":
-        patient_query = patient_query.filter(
-            Patient.created_by == current_user.id
+    patients = (
+        get_accessible_patient_query(
+            db=db,
+            current_user=current_user
         )
-
-    patients = patient_query.all()
+        .all()
+    )
 
     patient_records = []
 

@@ -106,7 +106,7 @@ def get_my_lab_orders(
             .all()
         )
 
-    if current_user.role == "admin":
+    if current_user.role in {"admin", "lab_technician"}:
 
         return (
             db.query(LabOrder)

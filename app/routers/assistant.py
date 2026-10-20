@@ -31,9 +31,8 @@ from app.models import (
     RiskPrediction
 )
 
-from app.routers.auth import (
-    get_current_user
-)
+from app.routers.auth import get_current_user
+from app.services.access_service import get_accessible_patient_query
 
 
 router = APIRouter(
@@ -46,14 +45,14 @@ def build_database_context(
     current_user: User,
     db: Session
 ):
-    patient_query = db.query(Patient)
-
-    if current_user.role != "admin":
-        patient_query = patient_query.filter(
-            Patient.created_by == current_user.id
+    patients = (
+        get_accessible_patient_query(
+            db=db,
+            current_user=current_user
         )
-
-    patients = patient_query.all()
+        .order_by(Patient.id.asc())
+        .all()
+    )
 
     context = []
 
@@ -258,16 +257,56 @@ Use the user's natural-language question to
 identify which patient or patients they are
 asking about.
 
-For example:
+LANGUAGE RULES:
 
-- "Show Anuj's reports"
-- "What is Patient 5's latest health record?"
-- "Tell me about TRN010"
-- "How many patients are there?"
-- "Which patients have high risk predictions?"
-- "What is the average glucose level?"
+1. Detect the language used by the user.
+2. Answer in the same language as the user.
+3. If the user uses Hindi, answer in Hindi.
+4. If the user uses English, answer in English.
+5. If the user uses Hinglish, answer naturally
+   in Hinglish.
+6. Do not unnecessarily translate medical terms
+   that are commonly used in English.
+7. Keep the language natural and easy to understand.
+8. Do not change the user's language unless
+   necessary for clarity.
 
-Rules:
+RESPONSE FORMATTING RULES:
+
+1. Write professional, well-structured answers.
+2. Use Markdown formatting where useful.
+3. Use clear headings for different sections.
+4. Use bold text for important values or labels.
+5. Use numbered lists for ordered information.
+6. Use bullet points for unordered information.
+7. Keep separate paragraphs for separate ideas.
+8. Do not create extremely long paragraphs.
+9. Do not use unnecessary decorative formatting.
+10. Do not repeat the same information unnecessarily.
+
+For example, a good response can look like:
+
+**Patient Summary**
+
+**Name:** Anuj  
+**Age:** 25  
+**Gender:** Male
+
+**Latest Health Record**
+
+1. **Glucose:** 98
+2. **BMI:** 22.4
+3. **Heart Rate:** 76
+
+**Risk Assessment**
+
+- **Risk:** Low
+- **Confidence:** 92%
+
+Do NOT put unnecessary `**` around every word.
+Use Markdown only where it improves readability.
+
+DATA AND SAFETY RULES:
 
 1. Never invent patient information.
 2. Never invent medical values.
@@ -295,6 +334,8 @@ Rules:
     the patient was not found.
 15. Do not assume that a risk prediction is
     a medical diagnosis.
+16. Use only the accessible database context
+    supplied by the application.
 
 Database context:
 
@@ -461,11 +502,14 @@ def ask_healthcare_assistant(
 
                 provider_used = "Gemini"
 
-            except Exception as e:
+            except Exception:
 
                 raise HTTPException(
                     status_code=503,
-                    detail=f"Gemini failed: {str(e)}"
+                    detail=(
+                        "Gemini is currently unavailable. "
+                        "Please try again later."
+                    )
                 )
 
         elif provider == "groq":
@@ -479,49 +523,49 @@ def ask_healthcare_assistant(
 
                 provider_used = "Groq"
 
-            except Exception as e:
+            except Exception:
 
                 raise HTTPException(
                     status_code=503,
-                    detail=f"Groq failed: {str(e)}"
+                    detail=(
+                        "Groq is currently unavailable. "
+                        "Please try again later."
+                    )
                 )
 
         else:
 
-            gemini_error = None
-
             try:
 
-                response = ask_with_gemini(
+                response = ask_with_groq(
                     question=question,
                     context=database_context
                 )
 
-                provider_used = "Gemini"
+                provider_used = "Groq"
 
-            except Exception as e:
+            except Exception:
 
-                gemini_error = str(e)
+                response = None
 
             if response is None:
 
                 try:
 
-                    response = ask_with_groq(
+                    response = ask_with_gemini(
                         question=question,
                         context=database_context
                     )
 
-                    provider_used = "Groq"
+                    provider_used = "Gemini"
 
-                except Exception as groq_error:
+                except Exception:
 
                     raise HTTPException(
                         status_code=503,
                         detail=(
-                            "Both AI providers failed. "
-                            f"Gemini: {gemini_error}. "
-                            f"Groq: {str(groq_error)}"
+                            "AI services are temporarily unavailable. "
+                            "Please try again."
                         )
                     )
 
@@ -535,12 +579,9 @@ def ask_healthcare_assistant(
             "question": question,
             "answer": answer,
             "data_scope": (
-                "All accessible patients"
+                "All hospital patients"
                 if current_user.role == "admin"
-                else (
-                    "Patients created by "
-                    "current user"
-                )
+                else "Only the patients accessible to the current user"
             ),
             "disclaimer": (
                 "This AI assistant provides "
@@ -553,11 +594,12 @@ def ask_healthcare_assistant(
     except HTTPException:
         raise
 
-    except Exception as e:
+    except Exception:
 
         raise HTTPException(
             status_code=500,
             detail=(
-                f"AI assistant failed: {str(e)}"
+                "AI assistant could not process "
+                "your request. Please try again."
             )
         )

@@ -31,7 +31,18 @@ class UserRegister(BaseModel):
 
         allowed_roles = {
             "admin",
+            "department_admin",
             "doctor",
+            "nurse",
+            "receptionist",
+            "canteen_manager",
+            "canteen_worker",
+            "housekeeping_supervisor",
+            "housekeeping_worker",
+            "lab_technician",
+            "pharmacist",
+            "radiology_technician",
+            "patient",
             "staff"
         }
 
@@ -87,6 +98,7 @@ class PatientResponse(BaseModel):
     address: str | None
     medical_history: str | None
     created_by: int | None
+    user_id: int | None
 
     class Config:
         from_attributes = True

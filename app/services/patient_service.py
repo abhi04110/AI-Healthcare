@@ -23,6 +23,12 @@ def create_patient_service(
     current_user: User,
     db: Session
 ):
+    if current_user.role == "patient":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Patients cannot create patient records"
+        )
+
     existing_patient = (
         db.query(Patient)
         .filter(
@@ -62,6 +68,9 @@ def get_patients_service(
 ):
     if current_user.role == "admin":
         query = db.query(Patient)
+
+    elif current_user.role == "patient":
+        query = db.query(Patient).filter(Patient.user_id == current_user.id)
 
     elif current_user.role == "doctor":
         query = (
@@ -109,6 +118,14 @@ def get_patient_service(
         )
 
     if current_user.role == "admin":
+        return patient
+
+    if current_user.role == "patient":
+        if patient.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to this patient"
+            )
         return patient
 
     if current_user.role == "doctor":

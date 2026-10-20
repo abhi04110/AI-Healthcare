@@ -7,3 +7,30 @@ __pycache__/
 # Database backups
 *.dump
 *.backup
+
+uploads/
+ml_models/*.joblib
+ml_models/*metadata.json
+
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/dist/
+node_modules/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment secrets
+.env
+
+# Ignore frontend completely
+/frontend/
+package-lock.json
+
+# Ignore environment and cache
+/env/
+node_modules/
+__pycache__/
+*.py[cod]
+.env

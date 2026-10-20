@@ -1,8 +1,17 @@
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+import asyncio
+
+from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
-from app.database import engine, Base
+from app.database import engine, Base, ensure_runtime_schema
+from app.config import FRONTEND_URL
 from app import models, hms_models
+
+from app.services.ml_scheduler import ml_training_scheduler
+
+from app.routers.auth import require_admin
 
 from app.routers import (
     auth,
@@ -26,11 +35,26 @@ from app.routers import (
     hms_icu,
     hms_ot,
     hms_housekeeping,
-    hms_canteen
+    hms_canteen,
+    hms_dashboard_router
 )
 
 
 Base.metadata.create_all(bind=engine)
+ensure_runtime_schema()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    training_task = asyncio.create_task(ml_training_scheduler())
+    try:
+        yield
+    finally:
+        training_task.cancel()
+        try:
+            await training_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(
@@ -47,11 +71,22 @@ app = FastAPI(
     - Healthcare Analytics
     - AI Healthcare Assistant
     """,
-    version="2.0.0"
+    version="3.0.0",
+    lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[FRONTEND_URL],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
 app.include_router(auth.router)
+from app.routers import public_portal
+app.include_router(public_portal.router)
 app.include_router(patients.router)
 app.include_router(reports.router)
 app.include_router(ocr.router)
@@ -73,6 +108,7 @@ app.include_router(hms_icu.router)
 app.include_router(hms_ot.router)
 app.include_router(hms_housekeeping.router)
 app.include_router(hms_canteen.router)
+app.include_router(hms_dashboard_router)
 
 @app.get("/")
 def home():
@@ -90,7 +126,8 @@ def health_check():
 
 
 @app.get("/database-check")
-def database_check():
+def database_check(current_user=Depends(require_admin)):
+
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
@@ -108,7 +145,8 @@ def database_check():
 
 
 @app.get("/tables")
-def get_tables():
+def get_tables(current_user=Depends(require_admin)):
+
     try:
         with engine.connect() as connection:
             result = connection.execute(

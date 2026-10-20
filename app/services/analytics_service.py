@@ -1,11 +1,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.models import (
-    Patient,
-    HealthRecord,
-    RiskPrediction
-)
+from app.models import Patient, HealthRecord, RiskPrediction
+from app.services.access_service import get_accessible_patient_query as shared_accessible_patient_query
 
 
 NUMERIC_FIELDS = [
@@ -17,53 +14,24 @@ NUMERIC_FIELDS = [
 ]
 
 
-def get_accessible_patient_query(
-    db: Session,
-    current_user
-):
-    query = db.query(Patient)
-
-    if current_user.role != "admin":
-        query = query.filter(
-            Patient.created_by == current_user.id
-        )
-
-    return query
+def _shared_accessible_patient_query(db: Session, current_user):
+    return shared_accessible_patient_query(db, current_user)
 
 
-def get_accessible_health_records_query(
-    db: Session,
-    current_user
-):
-    query = db.query(HealthRecord).join(
-        Patient,
-        HealthRecord.patient_id == Patient.id
-    )
-
-    if current_user.role != "admin":
-        query = query.filter(
-            Patient.created_by == current_user.id
-        )
-
-    return query
+def get_accessible_patient_query(db: Session, current_user):
+    return _shared_accessible_patient_query(db, current_user)
 
 
-def get_accessible_predictions_query(
-    db: Session,
-    current_user
-):
-    query = db.query(RiskPrediction).join(
-        Patient,
-        RiskPrediction.patient_id == Patient.id
-    )
+def get_accessible_health_records_query(db: Session, current_user):
+    patient_query = _shared_accessible_patient_query(db, current_user)
+    patient_ids = patient_query.with_entities(Patient.id).subquery()
+    return db.query(HealthRecord).filter(HealthRecord.patient_id.in_(patient_ids))
 
-    if current_user.role != "admin":
-        query = query.filter(
-            Patient.created_by == current_user.id
-        )
 
-    return query
-
+def get_accessible_predictions_query(db: Session, current_user):
+    patient_query = _shared_accessible_patient_query(db, current_user)
+    patient_ids = patient_query.with_entities(Patient.id).subquery()
+    return db.query(RiskPrediction).filter(RiskPrediction.patient_id.in_(patient_ids))
 
 def get_basic_analytics(
     db: Session,
