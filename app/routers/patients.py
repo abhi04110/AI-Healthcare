@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -50,7 +52,7 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED
 )
 def create_patient(
-    patient_code: str = Form(...),
+    patient_code: str | None = Form(None, description="Optional. Leave blank to generate a patient code automatically."),
     name: str = Form(...),
     age: int = Form(...),
     gender: str = Form(...),
@@ -62,8 +64,9 @@ def create_patient(
     ),
     db: Session = Depends(get_db)
 ):
+    generated_patient_code = (patient_code or f"PAT-{uuid4().hex[:12].upper()}").strip()
     patient_data = PatientCreate(
-        patient_code=patient_code,
+        patient_code=generated_patient_code,
         name=name,
         age=age,
         gender=gender,

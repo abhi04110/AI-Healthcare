@@ -25,3 +25,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 ML_RETRAIN_INTERVAL_HOURS = int(os.getenv("ML_RETRAIN_INTERVAL_HOURS", "24"))
+
+# Local RAG knowledge-base settings. Paths are resolved relative to the project root.
+MEDICAL_KNOWLEDGE_DIR = Path(os.getenv("MEDICAL_KNOWLEDGE_DIR", str(BASE_DIR / "medical_knowledge")))
+VECTOR_STORE_DIR = Path(os.getenv("VECTOR_STORE_DIR", str(BASE_DIR / "vector_store")))
+RAG_EMBEDDING_MODEL = os.getenv("RAG_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+RAG_CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "1000"))
+RAG_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "150"))
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "4"))
