@@ -48,7 +48,7 @@ from app.services.rag_service import (
     list_medical_documents,
     delete_medical_document,
 )
-
+from app.services.rag_queue import enqueue_rag_sync
 
 router = APIRouter(
     prefix="/assistant",
@@ -504,25 +504,34 @@ async def upload_medical_knowledge_document(
     destination.write_bytes(content)
 
     try:
-        result = ingest_medical_documents()
+        # Redis/RQ worker will index the uploaded document in the background.
+        queue_result = enqueue_rag_sync(
+            reason=f"upload:{safe_filename}"
+        )
     except Exception as exc:
-        # Keep the uploaded source for admin recovery, but report indexing failure clearly.
         raise HTTPException(
             status_code=503,
             detail=(
-                "The document was uploaded but could not be indexed. Check that the "
-                "RAG dependencies are installed and the embedding model can be loaded. "
+                "The document was uploaded successfully, but the indexing job could not be queued."
+                "Please check whether Redis and the RQ worker are running. "
                 f"Details: {type(exc).__name__}: {exc}"
             ),
         ) from exc
 
     return {
-        "status": result.get("status", "success"),
-        "message": ("Medical reference uploaded and indexing completed" if result.get("status") == "success" else "Document uploaded; review ingestion results for files that could not be indexed."),
+        "status": "accepted",
+        "message": (
+            "Medical reference uploaded; indexing has been queued "
+            "in the background"
+        ),
         "original_filename": file.filename,
         "stored_filename": safe_filename,
-        "ingestion": result,
-        "note": "Only trusted, current references should be uploaded. OCR may misread text, tables, handwriting, or charts; verify important passages in the original file. Retrieved content is decision support, not a diagnosis.",
+        "indexing_job": queue_result,
+        "note": (
+            "Indexing will happen in the background. Check the RQ worker logs "
+            "for completion. Medical references are for educational "
+            "decision support, not for diagnosis."
+        ),
     }
 
 

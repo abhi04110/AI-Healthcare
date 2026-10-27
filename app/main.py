@@ -1,5 +1,7 @@
-from contextlib import asynccontextmanager
+
 import asyncio
+import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +12,7 @@ from app.config import FRONTEND_URL
 from app import models, hms_models
 
 from app.services.ml_scheduler import ml_training_scheduler
-
+from app.services.rag_scheduler import rag_daily_scheduler
 from app.routers.auth import require_admin
 
 from app.routers import (
@@ -36,9 +38,10 @@ from app.routers import (
     hms_ot,
     hms_housekeeping,
     hms_canteen,
-    hms_dashboard_router
+    hms_dashboard_router,
 )
 
+logger = logging.getLogger(__name__)
 
 Base.metadata.create_all(bind=engine)
 ensure_runtime_schema()
@@ -46,33 +49,35 @@ ensure_runtime_schema()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    training_task = asyncio.create_task(ml_training_scheduler())
+    ml_task = asyncio.create_task(ml_training_scheduler())
+    rag_task = asyncio.create_task(rag_daily_scheduler())
+
     try:
         yield
     finally:
-        training_task.cancel()
-        try:
-            await training_task
-        except asyncio.CancelledError:
-            pass
+        tasks = [ml_task, rag_task]
+
+        for task in tasks:
+            task.cancel()
+
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 app = FastAPI(
     title="AI Healthcare & Hospital Management System",
     description="""
-    Hospital Management System with:
-
-    - Authentication and role-based access
-    - Department Management
-    - Patient Management
-    - Medical Reports and OCR
-    - AI Health Risk Prediction
-    - Patient Clustering
-    - Healthcare Analytics
-    - AI Healthcare Assistant
-    """,
-    version="3.0.0",
-    lifespan=lifespan
+Hospital Management System with:
+- Authentication and role-based access
+- Department and staff management
+- Patient management
+- Medical reports and OCR
+- AI health risk prediction
+- Patient clustering
+- Healthcare analytics
+- AI healthcare assistant with medical knowledge RAG
+""",
+    version="3.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -83,9 +88,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 app.include_router(auth.router)
+
 from app.routers import public_portal
+
 app.include_router(public_portal.router)
 app.include_router(patients.router)
 app.include_router(reports.router)
@@ -110,43 +116,41 @@ app.include_router(hms_housekeeping.router)
 app.include_router(hms_canteen.router)
 app.include_router(hms_dashboard_router)
 
+
 @app.get("/")
 def home():
     return {
         "message": "AI Healthcare and Hospital Management System is running",
-        "status": "success"
+        "status": "success",
     }
 
 
 @app.get("/health")
 def health_check():
-    return {
-        "status": "healthy"
-    }
+    return {"status": "healthy"}
 
 
 @app.get("/database-check")
 def database_check(current_user=Depends(require_admin)):
-
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
 
         return {
             "status": "success",
-            "message": "PostgreSQL database connected successfully"
+            "message": "PostgreSQL database connected successfully",
         }
 
-    except Exception as e:
+    except Exception:
+        logger.exception("Database connectivity check failed")
         return {
             "status": "error",
-            "message": str(e)
+            "message": "Database connection failed. Check backend logs.",
         }
 
 
 @app.get("/tables")
 def get_tables(current_user=Depends(require_admin)):
-
     try:
         with engine.connect() as connection:
             result = connection.execute(
@@ -157,16 +161,13 @@ def get_tables(current_user=Depends(require_admin)):
                     ORDER BY table_name
                 """)
             )
-
             tables = [row[0] for row in result]
 
-        return {
-            "status": "success",
-            "tables": tables
-        }
+        return {"status": "success", "tables": tables}
 
-    except Exception as e:
+    except Exception:
+        logger.exception("Could not list database tables")
         return {
             "status": "error",
-            "message": str(e)
+            "message": "Could not list database tables. Check backend logs.",
         }
