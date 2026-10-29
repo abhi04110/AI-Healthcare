@@ -170,4 +170,4 @@ def get_tables(current_user=Depends(require_admin)):
         return {
             "status": "error",
             "message": "Could not list database tables. Check backend logs.",
-        }
+            }
