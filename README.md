@@ -1,8 +1,8 @@
 # AI Healthcare Risk & Patient Analytics System
 
-An AI-powered healthcare analytics and hospital management **backend** built with FastAPI, PostgreSQL, Machine Learning, OCR, patient analytics, and AI-assisted healthcare information retrieval.
+An AI-powered healthcare analytics and hospital management **backend** built with FastAPI, PostgreSQL, Machine Learning, OCR, and Retrieval-Augmented Generation (RAG).
 
-The project combines patient and medical record management with health-risk prediction, medical report processing, patient clustering, healthcare analytics, and hospital operational modules in a single REST API.
+The system combines patient and medical record management, health-risk prediction, patient clustering, healthcare analytics, hospital operations, and a medical knowledge assistant in a modular REST API.
 
 ## Table of Contents
 
@@ -14,116 +14,111 @@ The project combines patient and medical record management with health-risk pred
 - [Installation and Setup](#installation-and-setup)
 - [Environment Configuration](#environment-configuration)
 - [Running the Application](#running-the-application)
+- [Redis and Background RAG Indexing](#redis-and-background-rag-indexing)
+- [RAG Document Processing Workflow](#rag-document-processing-workflow)
+- [AI Assistant and Retrieval](#ai-assistant-and-retrieval)
 - [API Documentation](#api-documentation)
-- [API Modules](#api-modules)
 - [Machine Learning Workflow](#machine-learning-workflow)
 - [OCR Workflow](#ocr-workflow)
 - [Database Design](#database-design)
 - [Security and Access Control](#security-and-access-control)
 - [Troubleshooting](#troubleshooting)
 - [Limitations and Disclaimer](#limitations-and-disclaimer)
+- [Future Improvements](#future-improvements)
+- [Author](#author)
 
 ## Project Overview
 
 Healthcare systems manage patient profiles, health measurements, medical reports, appointments, laboratory results, prescriptions, billing information, and other operational records.
 
-This project provides a centralized backend to manage healthcare information and support data-driven analysis. It combines conventional hospital management operations with machine learning, OCR-based report extraction, statistical analytics, patient clustering, and an AI healthcare assistant.
+This project provides a centralized backend for healthcare data management and analysis. It integrates conventional hospital management functionality with machine learning, OCR-based report processing, patient segmentation, statistical analytics, and AI-assisted medical knowledge retrieval.
 
 ### Project Objectives
 
-- Centralize patient and hospital-related data.
-- Provide authenticated access to healthcare APIs.
+- Centralize patient and hospital-related information.
+- Provide authenticated REST APIs with role-aware access control.
 - Manage patient profiles, health records, and medical reports.
 - Extract text from supported medical documents.
-- Predict health-risk categories using a trained ML model.
+- Predict health-risk categories using machine learning.
 - Group patient records using clustering algorithms.
 - Generate healthcare summaries and identify statistical outliers.
-- Support appointments, laboratory workflows, prescriptions, pharmacy, billing, and other hospital operations.
-- Allow natural-language questions about available healthcare information through an AI assistant.
+- Support hospital operations, including appointments, laboratory workflows, prescriptions, pharmacy, billing, and emergency management.
+- Enable natural-language questions about healthcare information.
+- Retrieve relevant information from uploaded medical reference documents.
+- Process document indexing in the background using Redis and RQ.
+- Reconcile the medical knowledge index periodically.
 
 ## Key Features
 
 ### 1. Authentication and User Management
 
-The authentication module provides:
+The authentication module supports:
 
 - User registration and login.
 - JWT access-token generation.
 - Password hashing and verification.
 - Current-user profile retrieval.
 - Role-aware access control.
-- Admin-managed user creation.
+- Admin-managed user operations.
 - Patient-access restrictions based on application permissions.
 
-The application uses roles such as `admin`, `doctor`, and `staff` in its authentication and access-control logic.
+The application includes roles such as Admin, Doctor, and Staff, as implemented in the authentication and authorization logic.
 
 ### 2. Patient Management
 
-Patient APIs support the management of patient information, including:
+Patient-related functionality includes:
 
-- Patient code and personal details.
-- Age and gender.
-- Contact information and address.
+- Patient codes and personal details.
+- Age, gender, contact information, and address.
 - Medical history.
-- Patient-specific health records.
-- Patient-specific medical reports.
+- Patient-associated health records.
+- Medical reports and extracted information.
 - Risk-prediction history.
 - Patient timeline and related information.
 
-Patient access is handled through application-level authorization and patient-access services.
+Access to patient information is subject to the application's authorization rules.
 
 ### 3. Health Records
 
-The system stores structured health measurements associated with patients.
-
-The health-record and ML modules use fields such as:
+The system manages structured health measurements associated with patients, including supported fields such as:
 
 - Glucose
 - Blood pressure
 - BMI
 - Cholesterol
 - Heart rate
-- Risk label, where available
+- Risk labels, where available
 
-These measurements support health analytics and risk-model training or prediction when the required values are available.
+These records can support analytics, machine-learning training, and risk prediction when the required values are available.
 
 ### 4. Medical Report Management
 
-The report module supports uploading and managing medical reports associated with patients.
+The report module supports uploading and managing medical reports according to the implemented endpoint schemas.
 
-Supported document types include:
-
-- PDF
-- PNG
-- JPG
-- JPEG
-
-Report records can contain file information, extracted text, patient association, and upload-related metadata.
+Supported report types and operations should be checked in the running API documentation. Report processing can include file metadata, extracted text, and patient association.
 
 ### 5. Optical Character Recognition (OCR)
 
-The OCR module processes supported medical documents and extracts text.
-
-Technologies used:
+The OCR functionality uses technologies including:
 
 - Tesseract OCR
 - Pytesseract
 - Pillow
 - PyPDF
 
-The OCR service uses Tesseract for image-based documents and PyPDF for extracting embedded text from PDF pages.
+OCR can extract text from supported images and documents. Text-based PDFs can be processed through PDF text extraction. Scanned PDFs may require OCR processing, depending on the service implementation.
 
-Extracted text can be processed by the application's report-related workflows. OCR output may contain recognition errors and should be reviewed before use.
+OCR output can contain recognition errors and should be reviewed before clinical use.
 
 ### 6. Machine Learning Health-Risk Prediction
 
-The ML service uses a **Random Forest Classifier** to classify health-risk records into categories:
+The ML service uses a Random Forest Classifier to classify health-risk records into categories such as:
 
 - Low
 - Medium
 - High
 
-The six model features are:
+The model uses six features in its configured workflow:
 
 1. Age
 2. Glucose
@@ -132,77 +127,124 @@ The six model features are:
 5. Cholesterol
 6. Heart rate
 
-The prediction service returns a predicted risk category, confidence information, and class probabilities when the model supports them.
+Prediction responses can include the predicted category and confidence or probability information, depending on the endpoint.
 
-The repository includes a serialized model file at `ml_models/health_risk_model.joblib`.
+The repository's configured model path is:
 
-### 7. Model Training and Status
+`ml_models/health_risk_model.joblib`
 
-The prediction module includes model-related operations for:
+Actual model availability depends on the files present in the local environment.
 
-- Checking model status.
-- Reviewing training-data readiness.
-- Training the risk model.
-- Evaluating model performance.
-- Saving the trained model.
-- Tracking training metadata.
-- Generating predictions from health measurements.
-- Retrieving prediction history.
+### 7. Model Training and Scheduling
 
-Training reads complete, labelled health records from PostgreSQL. The training service checks that enough records and risk classes are available before fitting the model.
+The machine-learning module supports model-status checks, training-data readiness checks, training, evaluation, model persistence, and prediction history.
 
-The application also includes a scheduled ML training service configured through `ML_RETRAIN_INTERVAL_HOURS`.
+The training service reads labelled health records from PostgreSQL. The `ML_RETRAIN_INTERVAL_HOURS` setting controls the configured scheduled training interval.
+
+Model performance depends on the quantity, quality, representativeness, and correctness of the training data. High accuracy on a small or synthetic dataset does not establish clinical validity.
 
 ### 8. Patient Clustering
 
-The clustering module provides three patient-segmentation approaches:
+The clustering module supports the configured algorithms:
 
 - K-Means
 - DBSCAN
 - Hierarchical Clustering
 
-The service prepares patient health measurements and uses numerical feature scaling where appropriate.
-
-Clustering can help explore similarities and patterns in available patient data. Cluster membership is an analytical result, not a medical diagnosis.
+These methods help explore patterns and similarities among available patient records. Cluster membership is an analytical result and not a medical diagnosis.
 
 ### 9. Healthcare Analytics
 
-The analytics service provides healthcare summaries and statistical analysis, including:
+The analytics module provides supported statistical summaries, including:
 
-- Total patient counts.
+- Patient counts.
 - Health-record summaries.
-- Average age and available health measurements.
-- Risk-category distribution.
-- Statistical outlier detection.
+- Averages of available health measurements.
+- Risk-category distributions.
+- Statistical outlier analysis.
 
-The outlier-detection service uses the Interquartile Range (IQR) method to identify unusually high or low values in supported numerical data.
+The configured outlier-detection workflow uses the Interquartile Range (IQR) method for supported numerical data.
 
 ### 10. AI Healthcare Assistant
 
-The AI assistant provides a natural-language interface to supported healthcare information.
+The AI assistant provides a natural-language interface to healthcare information.
 
-The implementation uses LangChain integrations for:
+The project includes integrations for language-model providers such as Groq and Google Gemini through the configured AI integration layer.
 
-- Google Gemini
-- Groq
+Depending on the question and implemented routing logic, the assistant can work with available healthcare data or retrieve relevant medical knowledge from indexed reference documents.
 
-The configured environment variables allow the application to select provider models. The assistant's implementation includes provider fallback logic.
+Example questions include:
 
-Example questions that illustrate the intended usage:
+- "Summarize the available medical reports."
+- "How many patients are registered?"
+- "What is the average glucose level?"
+- "According to the WHO hypertension guideline, which medicine classes are recommended?"
+- "Summarize the relevant information in the available medical references."
 
-- “Show the latest health information for a patient.”
-- “Summarize the available medical reports.”
-- “How many patients are registered?”
-- “Show the available risk-prediction information.”
-- “What is the average glucose level?”
+Actual answers depend on the database contents, document index, permissions, provider configuration, and implementation of the relevant endpoint.
 
-Actual answers depend on the records available in the database, the assistant's implemented query logic, and valid AI-provider configuration.
+### 11. Retrieval-Augmented Generation (RAG)
 
-### 11. Hospital Management System (HMS)
+The RAG module allows the assistant to retrieve relevant information from local medical reference documents before generating an answer.
 
-In addition to healthcare analytics, the backend includes modules for common hospital operations.
+Its main components are:
 
-| Module | Main responsibility |
+- Document storage
+- Text extraction
+- Chunking
+- Sentence Transformers embeddings
+- ChromaDB vector storage
+- Similarity-based retrieval
+- Language-model answer generation
+- Source metadata for document and page references
+
+The configured embedding model is:
+
+`sentence-transformers/all-MiniLM-L6-v2`
+
+The configured retrieval target is controlled by `RAG_TOP_K`.
+
+RAG helps ground responses in available documents, but retrieved content and generated answers still require appropriate verification.
+
+### 12. Background Document Indexing
+
+Document indexing is separated from the upload request using Redis and RQ.
+
+The workflow is:
+
+1. A supported document is uploaded through the API.
+2. The file is saved in the configured medical knowledge directory.
+3. The upload endpoint requests an indexing job through the RQ queue.
+4. Redis stores the queued job information.
+5. A running RQ worker consumes jobs from the configured queue.
+6. The worker invokes the RAG ingestion service.
+7. The service extracts text, creates chunks and embeddings, and updates the vector store.
+8. Job status and worker logs can be checked to determine whether processing succeeded.
+
+The upload endpoint returning an accepted or queued status does not by itself prove that indexing has completed.
+
+### 13. Daily Medical Knowledge Synchronization
+
+The RAG scheduler is started as part of the FastAPI application lifespan.
+
+The configured `RAG_SYNC_INTERVAL_HOURS` setting controls the interval between scheduled sync attempts. The example configuration uses a 24-hour interval.
+
+A synchronization run can inspect the document directory and reconcile the vector index according to the ingestion service's change-detection and cleanup logic.
+
+The intended behaviour is:
+
+- Index new documents.
+- Skip unchanged files when change detection confirms that they are unchanged.
+- Update indexed content when a document changes.
+- Remove indexed chunks for documents that have been deleted from the source directory.
+
+Successful synchronization depends on Redis availability, a running worker, and successful execution of the ingestion job. These behaviours should be verified through job results and retrieval tests.
+
+### 14. Hospital Management System
+
+The backend also includes modules for common hospital operations.
+
+| Module | Responsibility |
 |---|---|
 | Departments | Department records |
 | Staff | Staff management |
@@ -213,47 +255,50 @@ In addition to healthcare analytics, the backend includes modules for common hos
 | Laboratory | Lab orders and results |
 | Pharmacy | Medicine inventory and dispensing |
 | Billing | Bills, bill items, and payments |
-| Emergency | Emergency-case records and status |
-| ICU | ICU admissions and status |
+| Emergency | Emergency-case management |
+| ICU | ICU admission management |
 | Operation Theatre | Operation-theatre case management |
-| Housekeeping | Housekeeping tasks and assignments |
-| Canteen | Menu, orders, and order status |
+| Housekeeping | Housekeeping tasks |
+| Canteen | Menu and order management |
 | Dashboard | Hospital dashboard information |
 | Public Portal | Public-facing hospital and patient portal APIs |
 
-The exact operations available for each module are defined in its corresponding router file.
+Exact endpoint methods, fields, and permissions are defined by the router implementations and can be inspected through Swagger UI.
 
 ## Technology Stack
 
 | Category | Technologies |
 |---|---|
-| Language | Python |
+| Programming language | Python |
 | API framework | FastAPI |
 | ASGI server | Uvicorn |
-| Database | PostgreSQL |
+| Main database | PostgreSQL |
 | ORM | SQLAlchemy |
 | Authentication | JWT using PyJWT |
-| Password security | pwdlib with Argon2 support |
-| Request validation | FastAPI and Pydantic schemas |
+| Password security | pwdlib / Argon2 support |
 | Data processing | Pandas, NumPy |
 | Machine learning | Scikit-learn |
 | Model persistence | Joblib |
 | OCR | Tesseract, Pytesseract, Pillow |
-| PDF text extraction | PyPDF |
-| AI integration | LangChain, Google Gemini integration, Groq integration |
+| PDF processing | PyPDF, PyMuPDF |
+| Document processing | python-docx, openpyxl and supported format libraries |
+| AI integrations | LangChain integrations, Groq, Google Gemini |
+| Embeddings | Sentence Transformers |
+| Vector database | ChromaDB |
+| Background jobs | Redis and RQ |
+| Redis deployment for local development | Docker |
 | Configuration | python-dotenv |
 
 ## Project Structure
 
-The following structure is based on the files included in the repository.
+The following structure highlights the main application files and the RAG-related components. Other modules and supporting files may also exist in the repository.
 
 ```text
-AI-Healthcare-main/
+AI-Healthcare/
 ├── .env.example
 ├── .gitignore
 ├── README.md
 ├── requirements.txt
-│
 ├── app/
 │   ├── main.py
 │   ├── config.py
@@ -261,9 +306,7 @@ AI-Healthcare-main/
 │   ├── models.py
 │   ├── hms_models.py
 │   ├── schemas.py
-│   │
 │   ├── routers/
-│   │   ├── __init__.py
 │   │   ├── auth.py
 │   │   ├── patients.py
 │   │   ├── reports.py
@@ -273,130 +316,120 @@ AI-Healthcare-main/
 │   │   ├── analytics.py
 │   │   ├── assistant.py
 │   │   ├── public_portal.py
-│   │   ├── hms_departments.py
-│   │   ├── hms_staff.py
-│   │   ├── hms_assignments.py
-│   │   ├── hms_appointments.py
-│   │   ├── hms_consultations.py
-│   │   ├── hms_prescriptions.py
-│   │   ├── hms_labs.py
-│   │   ├── hms_pharmacy.py
-│   │   ├── hms_billing.py
-│   │   ├── hms_emergency.py
-│   │   ├── hms_icu.py
-│   │   ├── hms_ot.py
-│   │   ├── hms_housekeeping.py
-│   │   ├── hms_canteen.py
-│   │   └── hms_dashboard.py
-│   │
+│   │   └── hms_*.py
 │   ├── services/
-│   │   ├── access_service.py
-│   │   ├── analytics_service.py
 │   │   ├── auth_service.py
+│   │   ├── analytics_service.py
 │   │   ├── clustering_service.py
-│   │   ├── ml_scheduler.py
 │   │   ├── ml_service.py
+│   │   ├── ml_scheduler.py
 │   │   ├── ocr_service.py
-│   │   └── patient_service.py
-│   │
+│   │   ├── rag_service.py
+│   │   ├── rag_queue.py
+│   │   ├── rag_worker.py
+│   │   └── rag_scheduler.py
 │   └── utils/
 │       └── security.py
-│
 ├── datasets/
-│   └── health_risk_dataset.csv
-│
 ├── ml_models/
-│   └── health_risk_model.joblib
-│
+├── medical_knowledge/
+├── vector_store/
 └── uploads/
-    ├── 7d50707d77d34af3a7253cfb571df7d2.png
-    └── d00d3a323e69438c959640c1e6c3adf9.png
 ```
 
-### Important Files and Directories
+The `medical_knowledge/`, `vector_store/`, and `uploads/` directories are local runtime storage locations when configured that way. Their contents may not be tracked by Git and may need to be recreated or restored when setting up another environment.
 
-- `app/main.py` — Creates the FastAPI application, registers routers, configures CORS, initializes database metadata and runtime schema setup, and starts the ML scheduler through the application lifespan.
-- `app/config.py` — Loads environment variables and defines database, JWT, CORS, and scheduler settings.
-- `app/database.py` — Configures database connectivity, SQLAlchemy, and database helpers.
-- `app/models.py` — Defines core application models such as users, patients, health records, medical reports, and risk predictions.
+### Important Files
+
+- `app/main.py` — Creates the FastAPI application, registers routers, initializes database metadata and starts application-lifespan schedulers.
+- `app/config.py` — Loads environment variables and defines database, JWT, AI, RAG, Redis, and scheduler settings.
+- `app/database.py` — Configures SQLAlchemy and database connectivity.
+- `app/models.py` — Defines core healthcare data models.
 - `app/hms_models.py` — Defines hospital-management data models.
-- `app/schemas.py` — Defines request and response schemas used by the API.
-- `app/routers/` — Contains the API endpoints grouped by functional area.
-- `app/services/` — Contains authentication, access-control, patient, OCR, ML, clustering, scheduling, and analytics logic.
-- `app/utils/security.py` — Contains shared security helpers.
-- `datasets/health_risk_dataset.csv` — Dataset file included in the repository.
-- `ml_models/health_risk_model.joblib` — Serialized ML model file.
-- `uploads/` — Local report-upload storage included in the repository snapshot.
-- `.env.example` — Template for the application's environment variables.
-- `requirements.txt` — Python dependency list.
+- `app/routers/` — Contains API endpoints grouped by functionality.
+- `app/services/rag_service.py` — Handles medical-document ingestion and vector-index operations.
+- `app/services/rag_queue.py` — Connects to Redis and enqueues RQ jobs.
+- `app/services/rag_worker.py` — Provides the background indexing job function.
+- `app/services/rag_scheduler.py` — Enqueues periodic RAG synchronization jobs.
+- `app/services/ml_service.py` — Contains machine-learning training and prediction logic.
+- `app/services/ocr_service.py` — Contains OCR and document text-extraction logic.
+- `medical_knowledge/` — Local source documents for the RAG knowledge base.
+- `vector_store/` — Local ChromaDB persistence directory, as configured.
+- `requirements.txt` — Python dependencies.
+- `.env.example` — Example configuration template.
 
 ## System Architecture
 
-The backend follows a modular structure in which API routing, business logic, database access, and model processing are separated.
+The backend is divided into API routing, business logic, database access, machine learning, document processing, and retrieval components.
 
 ```text
-Client / API Consumer
+Client / Swagger UI
         |
         v
 FastAPI Application
         |
         ├── Authentication and Access Control
-        |
         ├── Patient and Medical Report APIs
-        |
         ├── OCR and Report Processing
-        |
         ├── ML Prediction and Training
-        |
         ├── Clustering and Analytics
-        |
         ├── AI Healthcare Assistant
-        |
         └── Hospital Management APIs
-                    |
-                    v
+                  |
+                  v
              Service Layer
-                    |
-          ┌─────────┴─────────┐
-          v                   v
-     PostgreSQL          ML / OCR / AI
+                  |
+       ┌──────────┼──────────┐
+       v          v          v
+  PostgreSQL   ML / OCR   AI / RAG
+                             |
+                 ┌───────────┴───────────┐
+                 v                       v
+           ChromaDB Vector Store    Groq / Gemini
+                 ^
+                 |
+        RAG Ingestion Service
+                 ^
+                 |
+             RQ Worker
+                 ^
+                 |
+           Redis Job Queue
+                 ^
+                 |
+        Document Upload / Scheduler
 ```
 
-This diagram represents the main application components, not a deployment diagram or a guarantee that every external provider is available at all times.
+Redis and PostgreSQL have different roles. PostgreSQL stores structured application records. Redis is used by RQ to manage background jobs. ChromaDB stores vectors and document chunks for semantic retrieval.
 
 ## Installation and Setup
 
 ### Prerequisites
 
-Install the following before running the project:
+Install or configure:
 
-- Python compatible with the project's installed dependencies.
-- PostgreSQL database and a valid connection URL.
-- Git, if cloning the repository.
-- Tesseract OCR for image-based OCR processing.
-- Valid AI-provider API keys if using the AI assistant.
-
-The repository's `requirements.txt` lists the Python dependencies.
+- Python compatible with the project's dependencies.
+- PostgreSQL and a valid database connection.
+- Git.
+- Docker Desktop for the local Redis container.
+- Tesseract OCR for OCR operations that require it.
+- AI-provider API keys if using configured external language-model services.
 
 ### 1. Clone the Repository
 
-```bash
+```powershell
 git clone https://github.com/abhi04110/AI-Healthcare.git
 cd AI-Healthcare
 ```
 
-If you already have the source code downloaded, open a terminal in the project root—the directory containing `app/` and `requirements.txt`.
+If the project is already present on your computer, open PowerShell in the project root—the directory containing `app/` and `requirements.txt`.
 
-### 2. Create a Virtual Environment
-
-On Windows PowerShell:
+### 2. Create and Activate a Virtual Environment
 
 ```powershell
 python -m venv env
 .\env\Scripts\Activate.ps1
 ```
-
-If PowerShell blocks activation because of its execution policy, follow your organization's policy or use the appropriate activation method for your environment.
 
 ### 3. Install Dependencies
 
@@ -405,9 +438,11 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+Some libraries, particularly embedding and OCR dependencies, may require additional system resources or platform-specific setup.
+
 ### 4. Configure PostgreSQL
 
-Create or select a PostgreSQL database, then obtain its connection URL.
+Create or select a PostgreSQL database and obtain its connection URL.
 
 Example format:
 
@@ -415,357 +450,419 @@ Example format:
 postgresql://USERNAME:PASSWORD@HOST:5432/DATABASE_NAME
 ```
 
-Replace the placeholders with the actual database credentials and details. URL-encode special characters in credentials when necessary.
+Replace the example values with your actual database configuration. URL-encode special characters in credentials when necessary.
 
-### 5. Create the Environment File
+### 5. Configure Environment Variables
 
-Copy `.env.example` to `.env` in the project root.
-
-PowerShell:
+Create `.env` from the example template:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Open `.env` and replace the placeholder values with your actual configuration.
+Open `.env` and configure the actual values required by the application. Do not overwrite an existing working `.env` without preserving its values.
 
-**Do not commit `.env` or publish API keys, database passwords, or production secrets.**
+**Never commit `.env`, real API keys, database passwords, or other secrets to GitHub.**
 
-### 6. Install Tesseract OCR
+### 6. Configure Tesseract OCR
 
-Image-based OCR requires the Tesseract executable in addition to the Python package.
-
-On Windows, install Tesseract OCR and verify that the executable is available.
+Install Tesseract OCR on Windows and confirm that it is accessible.
 
 ```powershell
 tesseract --version
 ```
 
-The current `app/services/ocr_service.py` contains this Windows executable path:
+The OCR service may use the following Windows installation path:
 
 ```text
 C:\Program Files\Tesseract-OCR\tesseract.exe
 ```
 
-The service uses that path if the executable exists there. If Tesseract is installed elsewhere, update the path in the service or configure it appropriately for your environment.
+The configured path must match the actual installation.
 
-PDF text extraction uses PyPDF. Image-based OCR uses Tesseract through Pytesseract.
+### 7. Start PostgreSQL
+
+Ensure PostgreSQL is running and the database configured in `DATABASE_URL` is reachable before starting the application.
 
 ## Environment Configuration
 
-The repository's `.env.example` contains the following variables:
+The exact variables used by the running version are defined in `.env.example` and `app/config.py`.
+
+Common settings include:
 
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection URL |
-| `JWT_SECRET_KEY` | Secret used for JWT signing |
-| `JWT_ALGORITHM` | JWT signing algorithm; example uses `HS256` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access-token lifetime in minutes |
-| `ML_RETRAIN_INTERVAL_HOURS` | Interval configured for scheduled ML retraining |
-| `GROQ_API_KEY` | API key for Groq integration |
-| `GROQ_MODEL` | Model identifier for Groq |
-| `GEMINI_API_KEY` | API key for Google Gemini integration |
-| `GEMINI_MODEL` | Model identifier for Gemini |
-| `FRONTEND_URL` | Allowed CORS origin configured for the application |
+| `JWT_SECRET_KEY` | Secret for signing JWTs |
+| `JWT_ALGORITHM` | JWT signing algorithm |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token lifetime |
+| `FRONTEND_URL` | Allowed CORS origin |
+| `ML_RETRAIN_INTERVAL_HOURS` | ML scheduler interval |
+| `GROQ_API_KEY` | Groq API credential, if enabled |
+| `GROQ_MODEL` | Configured Groq model identifier |
+| `GEMINI_API_KEY` | Google Gemini credential, if enabled |
+| `GEMINI_MODEL` | Configured Gemini model identifier |
+| `MEDICAL_KNOWLEDGE_DIR` | Source-document directory |
+| `VECTOR_STORE_DIR` | ChromaDB persistence directory |
+| `RAG_EMBEDDING_MODEL` | Embedding model identifier |
+| `RAG_CHUNK_SIZE` | Target chunk size |
+| `RAG_CHUNK_OVERLAP` | Chunk overlap |
+| `RAG_TOP_K` | Target number of retrieved chunks |
+| `RAG_MAX_CONTEXT_CHARS` | Configured RAG context-size limit |
+| `REDIS_URL` | Redis connection URL |
+| `RAG_QUEUE_NAME` | RQ queue name |
+| `RAG_SYNC_INTERVAL_HOURS` | Periodic RAG sync interval |
+| `RAG_JOB_TIMEOUT_SECONDS` | Background job timeout |
+| `RAG_UPLOAD_MAX_MB` | Configured upload size limit |
 
-Example template:
+Example values for the RAG configuration are:
 
 ```dotenv
-DATABASE_URL=your_database_url_here
-
-JWT_SECRET_KEY=replace_with_a_long_random_secret
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=60
-
-ML_RETRAIN_INTERVAL_HOURS=24
-
-GROQ_API_KEY=your_groq_api_key_here
-GROQ_MODEL=openai/gpt-oss-120b
-
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-3.7-flash
-
-FRONTEND_URL=http://localhost:5173
+MEDICAL_KNOWLEDGE_DIR=medical_knowledge
+VECTOR_STORE_DIR=vector_store
+RAG_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+RAG_CHUNK_SIZE=1000
+RAG_CHUNK_OVERLAP=150
+RAG_TOP_K=4
+RAG_MAX_CONTEXT_CHARS=12000
+REDIS_URL=redis://localhost:6379/0
+RAG_QUEUE_NAME=medical-rag
+RAG_SYNC_INTERVAL_HOURS=24
+RAG_JOB_TIMEOUT_SECONDS=1800
+RAG_UPLOAD_MAX_MB=25
 ```
 
-Use the values from your actual `.env.example` as the starting point. Model identifiers can change or become unavailable, so confirm that the configured provider supports the model you choose.
-
-### Configuration Notes
-
-- `DATABASE_URL` is required by `app/config.py`; the application raises an error if it is missing.
-- Keep `JWT_SECRET_KEY` private and use a strong random value outside local development.
-- `FRONTEND_URL` controls the configured CORS origin. It does not mean a frontend application is included in this repository.
-- AI integrations require valid provider configuration to work.
-- The Tesseract executable must be installed separately from Python dependencies.
+Use the values from the actual `.env.example` and `app/config.py` in your checkout. The example above is not a replacement for any additional required settings.
 
 ## Running the Application
 
-From the project root, with the virtual environment activated and `.env` configured, run:
+### 1. Start the Redis Container
+
+Docker Desktop must be running.
+
+Create the Redis container once if it does not already exist:
 
 ```powershell
+docker run -d --name healthcare-redis -p 6379:6379 redis:7-alpine
+```
+
+On subsequent runs, start the existing container:
+
+```powershell
+docker start healthcare-redis
+```
+
+If Docker reports that the container is already running, you can check its status instead of creating another one.
+
+Verify Redis:
+
+```powershell
+docker exec healthcare-redis redis-cli ping
+```
+
+Expected output:
+
+```text
+PONG
+```
+
+### 2. Start the RQ Worker
+
+Open a separate PowerShell terminal in the project directory:
+
+```powershell
+cd C:\Users\HP\Desktop\healthcare_ai
+.\env\Scripts\Activate.ps1
+rq worker --worker-class rq.worker.SimpleWorker medical-rag
+```
+
+The project uses `SimpleWorker` in this Windows setup because the default RQ worker previously encountered an `os.fork` compatibility error.
+
+Keep the worker terminal open. It processes queued jobs and displays success or failure logs.
+
+### 3. Start FastAPI
+
+Open another PowerShell terminal:
+
+```powershell
+cd C:\Users\HP\Desktop\healthcare_ai
+.\env\Scripts\Activate.ps1
 uvicorn app.main:app --reload --port 8000
 ```
 
-When startup succeeds, the API should be available at:
+If the backend is already running, do not start a second instance unnecessarily.
 
-```text
-http://127.0.0.1:8000
-```
+### 4. Open API Documentation
 
-### Interactive API Documentation
-
-FastAPI provides interactive documentation:
+After startup succeeds:
 
 - Swagger UI: `http://127.0.0.1:8000/docs`
 - ReDoc: `http://127.0.0.1:8000/redoc`
+- Root endpoint: `http://127.0.0.1:8000/`
+- Health endpoint: `http://127.0.0.1:8000/health`
 
-These pages allow you to inspect available endpoints, view request schemas, and try supported API operations.
+A successful health response alone does not prove that PostgreSQL, Redis, the RQ worker, the ML model, OCR, or external AI services are all working.
 
-### Basic Health Checks
+## Redis and Background RAG Indexing
 
-The application defines these utility routes:
+Redis is used as the job queue backend for RQ. It is not the main healthcare database and does not store the permanent medical knowledge index.
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `GET` | `/` | Returns an application-running message |
-| `GET` | `/health` | Returns a basic health status |
-| `GET` | `/database-check` | Checks the database connection; requires admin access |
-| `GET` | `/tables` | Lists public-schema database tables; requires admin access |
+### Responsibilities
 
-A successful `/health` response alone does not prove that PostgreSQL, OCR, the ML model, or external AI services are all working.
+| Component | Responsibility |
+|---|---|
+| FastAPI | Receives upload requests |
+| `rag_queue.py` | Enqueues background indexing jobs |
+| Redis | Stores queue and job state |
+| RQ worker | Executes indexing jobs |
+| `rag_worker.py` | Calls the ingestion service |
+| `rag_service.py` | Extracts, chunks, embeds, and indexes documents |
+| ChromaDB | Stores searchable vectors and document metadata |
+| `rag_scheduler.py` | Enqueues periodic reconciliation jobs |
+
+### Upload-to-Indexing Workflow
+
+1. Upload a supported file using the appropriate Swagger endpoint.
+2. The API saves the file in the configured medical knowledge directory.
+3. The upload endpoint queues an indexing job through `enqueue_rag_sync()`.
+4. Redis stores the job in the configured RQ queue.
+5. The running worker listens to the queue and executes available jobs.
+6. The ingestion service processes documents and updates the vector store.
+7. Inspect the worker logs and job result to confirm successful completion.
+8. Test document retrieval through the assistant or the available document-listing endpoint.
+
+An `accepted`, `queued`, or `already_queued` response does not necessarily mean that a document has finished indexing.
+
+### Running the Worker Manually
+
+From an activated virtual environment:
+
+```powershell
+rq worker --worker-class rq.worker.SimpleWorker medical-rag
+```
+
+Run this command once per worker process and leave the terminal running. You do not need to start a new worker for every uploaded file.
+
+If the worker stops, queued jobs may remain pending until a worker starts again. Redis must also be reachable.
+
+### Manual Indexing Job
+
+If a manual synchronization is needed, run the following from the project root with the virtual environment activated:
+
+```powershell
+python -c "from app.services.rag_queue import enqueue_rag_sync; print(enqueue_rag_sync('manual-sync'))"
+```
+
+Check the returned job information and the worker logs. If the result indicates an existing queued job, inspect that job rather than assuming a new job was created.
+
+### Daily Synchronization
+
+The application starts `rag_daily_scheduler()` during FastAPI startup. The scheduler attempts to enqueue a synchronization job at the configured interval.
+
+For the configured 24-hour interval, the intended process is:
+
+1. The scheduler attempts to enqueue a sync job.
+2. Redis stores the job.
+3. The RQ worker executes the job when available.
+4. The ingestion service scans and reconciles the source documents.
+5. The scheduler waits for the configured interval before its next attempt.
+
+For reliable operation, the backend, Redis, and worker must be available. If Redis is unavailable when the scheduler attempts to enqueue a job, review the backend logs and restart or manually enqueue synchronization as needed.
+
+## RAG Document Processing Workflow
+
+The ingestion service is responsible for turning source documents into searchable content.
+
+### Supported Formats
+
+The document-listing response in the current setup reports support for these formats:
+
+- PDF
+- TXT
+- MD
+- DOCX
+- XLSX
+- XLS
+- CSV
+- PNG
+- JPG
+- TIFF
+- BMP
+- WEBP
+
+Actual processing depends on the installed dependencies and the implementation for each format. Confirm format support through the running API and successful indexing tests.
+
+### Processing Stages
+
+**1. File storage**
+
+The uploaded file is saved to the configured source-document directory.
+
+**2. Text extraction**
+
+The ingestion service extracts text from the supported document format. Image-based or scanned content may require OCR.
+
+**3. Chunking**
+
+Long extracted text is divided into smaller sections. The configured chunk size and overlap determine how text is segmented.
+
+**4. Embedding generation**
+
+The embedding model converts chunks into numerical vectors for similarity-based retrieval.
+
+**5. Vector storage**
+
+The chunks, embeddings, and associated metadata are persisted in the configured ChromaDB store.
+
+**6. Retrieval**
+
+When a user asks a question, relevant indexed chunks can be retrieved and passed to the language model as context.
+
+### Incremental Synchronization
+
+The intended reconciliation behaviour is:
+
+| Source-document change | Expected index action |
+|---|---|
+| New file | Add its searchable chunks |
+| Unchanged file | Skip reprocessing when change detection confirms no change |
+| Modified file | Update its indexed content |
+| Deleted file | Remove its indexed chunks during successful reconciliation |
+
+These outcomes depend on the ingestion service's implementation and a successful job run. Use the job results and retrieval tests to verify actual behaviour.
+
+### Local Storage
+
+The source documents and vector index are separate:
+
+- `medical_knowledge/` contains source documents.
+- `vector_store/` contains the local vector index, according to the configured persistence path.
+- Redis manages background job state.
+
+The vector index is derived data and can require reindexing if it is missing or incompatible. Keep the source documents and configuration backed up appropriately.
+
+## AI Assistant and Retrieval
+
+The main assistant question-answering endpoint is registered under the assistant router. Inspect Swagger UI for the exact request schema and available operations.
+
+A typical RAG question-answering flow is:
+
+1. Receive the user's question.
+2. Determine the relevant information source according to the implemented assistant logic.
+3. Retrieve relevant medical document chunks from ChromaDB.
+4. Construct a prompt containing the question and retrieved context.
+5. Call the configured language-model provider.
+6. Return the answer and available source metadata.
+
+Source metadata may include the filename and page number. Citations help users trace an answer back to a reference document, but they do not guarantee that the answer is correct or that the source is authoritative.
+
+For patient-specific questions, authorization and patient scoping are essential. Only the minimum necessary, authorized patient context should be used. General medical questions should not require unrelated patient records.
 
 ## API Documentation
 
-The API routes are registered through `app/main.py`. The application exposes functional groups for authentication, patient records, medical reports, OCR, prediction, clustering, analytics, the AI assistant, and hospital management.
+The routes are registered through `app/main.py`. Use Swagger UI to inspect the exact methods, paths, request bodies, response schemas, and authentication requirements for the running version.
 
-Use `/docs` to inspect the precise request fields, response models, required authentication, and available operations for the version you are running.
+### Main API Modules
 
-### API Module Reference
-
-| Module | Router prefix | Responsibility |
-|---|---|---|
-| Authentication | `/auth` | Registration, login, user profile, and user administration |
-| Patients | `/patients` | Patient profiles and related health-record operations |
-| Medical Reports | `/reports` | Report upload, retrieval, and deletion |
-| OCR | `/ocr` | Medical document text extraction and processing |
-| ML Prediction | `/prediction` | Model status, risk prediction, training-related operations, and history |
-| Patient Clustering | `/clustering` | K-Means, DBSCAN, and hierarchical clustering |
-| Healthcare Analytics | `/analytics` | Summary statistics, risk distribution, and outlier analysis |
-| AI Healthcare Assistant | `/assistant` | Natural-language healthcare questions |
-| Public Hospital Portal | `/public` | Doctor discovery, availability, bookings, and patient portal operations |
-| HMS Departments | `/hms/departments` | Department operations |
-| HMS Staff | `/hms/staff` | Staff-management operations |
-| HMS Assignments | `/hms/assignments` | Patient assignment operations |
-| HMS Appointments | `/hms/appointments` | Appointment management |
-| HMS Consultations | `/hms/consultations` | Consultation operations |
-| HMS Prescriptions | `/hms/prescriptions` | Prescription operations |
-| HMS Laboratory | `/hms/labs` | Lab orders and results |
-| HMS Pharmacy | `/hms/pharmacy` | Medicines, stock, and dispensing |
-| HMS Billing | `/hms/billing` | Bills, bill items, and payments |
-| HMS Emergency | `/hms/emergency` | Emergency-case operations |
-| HMS ICU | `/hms/icu` | ICU admission operations |
-| HMS Operation Theatre | `/hms/ot` | Operation-theatre case operations |
-| HMS Housekeeping | `/hms/housekeeping` | Housekeeping tasks |
-| HMS Canteen | `/hms/canteen` | Menu and order operations |
-| HMS Dashboard | `/hms/dashboard` | Hospital dashboard information |
-
-The module names above reflect the router prefixes defined in the code. Individual endpoints, HTTP methods, query parameters, and request schemas are documented by FastAPI's interactive documentation.
+| Module | Responsibility |
+|---|---|
+| Authentication | Registration, login, profile, and user administration |
+| Patients | Patient profiles and related health-record operations |
+| Medical Reports | Report upload and management |
+| OCR | Medical document text extraction |
+| Prediction | Health-risk prediction and model operations |
+| Clustering | Patient segmentation |
+| Analytics | Healthcare summaries and outlier analysis |
+| Assistant | Natural-language healthcare questions and medical knowledge retrieval |
+| Public Portal | Public-facing hospital and patient portal operations |
+| HMS Departments | Department operations |
+| HMS Staff | Staff operations |
+| HMS Assignments | Patient assignments |
+| HMS Appointments | Appointment management |
+| HMS Consultations | Consultation operations |
+| HMS Prescriptions | Prescription operations |
+| HMS Laboratory | Lab orders and results |
+| HMS Pharmacy | Pharmacy operations |
+| HMS Billing | Billing operations |
+| HMS Emergency | Emergency-case operations |
+| HMS ICU | ICU admission operations |
+| HMS Operation Theatre | Operation-theatre operations |
+| HMS Housekeeping | Housekeeping operations |
+| HMS Canteen | Canteen operations |
+| HMS Dashboard | Hospital dashboard information |
 
 ### Authentication
 
-The authentication router is registered under:
+The authentication router is registered under `/auth`.
 
-```text
-/auth
-```
+Implemented operations include registration, login, profile retrieval, and protected user-management operations. Use the authentication mechanism shown in Swagger UI for protected routes.
 
-Its implemented operations include:
+### Assistant Endpoint
 
-- `POST /auth/register` — Register a user.
-- `POST /auth/login` — Authenticate a user and obtain a token.
-- `POST /auth/users` — Create a user through the admin-protected operation.
-- `GET /auth/me` — Retrieve the current authenticated user's profile.
+The assistant question-answering endpoint is:
 
-Login uses form-based credentials in the current implementation. After obtaining a token, use the authorization mechanism shown in Swagger UI for protected endpoints.
+`POST /assistant/ask`
 
-### Prediction API Examples
+Use the running OpenAPI documentation to inspect the exact request schema and response format.
 
-The prediction router includes the following routes:
+### Basic Health Checks
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| `GET` | `/prediction/model-status` | Inspect saved model status |
-| `POST` | `/prediction/risk` | Predict risk from supplied health measurements |
-| `POST` | `/prediction/patient/{patient_id}` | Predict risk for a patient |
-| `GET` | `/prediction/patient/{patient_id}/history` | Retrieve a patient's prediction history |
-| `GET` | `/prediction/history` | Retrieve prediction history subject to access rules |
-
-The source also defines training-related routes that are hidden from the generated OpenAPI schema. Consult the code and runtime configuration before calling those routes directly.
-
-### Analytics API
-
-The analytics router defines:
-
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `GET` | `/analytics/summary` | Healthcare summary statistics |
-| `GET` | `/analytics/risk-distribution` | Risk-category distribution |
-| `GET` | `/analytics/outliers` | Statistical outlier analysis |
-
-### Clustering API
-
-The clustering router defines these operations:
-
-| Method | Endpoint | Algorithm |
-|---|---|---|
-| `POST` | `/clustering/kmeans` | K-Means |
-| `POST` | `/clustering/dbscan` | DBSCAN |
-| `POST` | `/clustering/hierarchical` | Hierarchical clustering |
-
-### AI Assistant API
-
-The assistant router is registered under:
-
-```text
-/assistant
-```
-
-Its main question-answering endpoint is:
-
-```text
-POST /assistant/ask
-```
-
-Inspect `/docs` for the exact request body, available provider options, and response format.
-
-### Public Portal API
-
-The public portal is registered under:
-
-```text
-/public
-```
-
-Its route definitions include doctor listing, availability, appointment booking, existing-patient booking, patient profile operations, appointment cancellation, prescriptions, bills, laboratory information, and patient records.
-
-Some patient-specific operations require appropriate portal authentication or access credentials. Check the endpoint dependencies in `/docs` and the router implementation.
+| GET | `/` | Application-running message |
+| GET | `/health` | Basic health status |
+| GET | `/database-check` | Database connectivity check; admin access required |
+| GET | `/tables` | Lists public-schema tables; admin access required |
 
 ## Machine Learning Workflow
 
 The ML service is implemented in `app/services/ml_service.py`.
 
-### Training Data
-
-The training service reads labelled health records from PostgreSQL. Records must contain the features required by the model and a valid risk label.
-
-The expected risk labels are:
-
-- `low`
-- `medium`
-- `high`
-
-The training implementation requires at least 10 complete labelled records, at least two different classes, and at least two records per class.
-
 ### Training Process
 
-1. Retrieve complete labelled health records.
-2. Validate the risk labels and available data.
-3. Select the six model features.
+1. Retrieve eligible labelled health records from PostgreSQL.
+2. Validate required fields and risk labels.
+3. Prepare the configured numerical features.
 4. Split data into training and testing sets.
-5. Fit a Random Forest Classifier.
+5. Fit the configured Random Forest model.
 6. Evaluate the model on the test split.
-7. Save the serialized model.
-8. Write training metadata, including the evaluation metrics.
+7. Save the serialized model and available training metadata.
 
-The serialized model is stored at:
+The configured serialized model path is:
 
-```text
-ml_models/health_risk_model.joblib
-```
+`ml_models/health_risk_model.joblib`
 
-Training metadata is written to:
-
-```text
-ml_models/health_risk_model_metadata.json
-```
-
-The metadata file is created by the training service and may not exist until training has run.
-
-### Prediction Process
-
-For direct predictions, the ML service loads the saved model and prepares the required numerical features. It then returns the predicted class and associated probability information.
-
-A patient-based prediction uses the corresponding patient's available health record data. The exact validation requirements and error responses are defined in the prediction router and ML service.
-
-### Scheduled Training
-
-The application starts `ml_training_scheduler()` as part of its FastAPI lifespan. The configured `ML_RETRAIN_INTERVAL_HOURS` value controls the scheduled interval.
-
-For meaningful evaluation, the dataset should contain representative, correctly labelled records. A high score on a small or synthetic dataset does not establish real-world clinical accuracy.
+A high score on a small or synthetic dataset does not establish real-world clinical accuracy.
 
 ## OCR Workflow
 
-OCR functionality is implemented in `app/services/ocr_service.py` and exposed through the OCR and report routers.
+OCR functionality is implemented in `app/services/ocr_service.py` and exposed through the relevant routers.
 
-### Image-Based Documents
+For supported images, the service can use Pillow and Tesseract through Pytesseract. Text-based PDFs can be processed through PDF extraction libraries.
 
-For PNG, JPG, and JPEG files, the service:
+Scanned PDF handling depends on whether the service renders pages for OCR. Image quality, page layout, scan quality, and language affect extraction accuracy.
 
-1. Opens the image with Pillow.
-2. Passes the image to Tesseract through Pytesseract.
-3. Returns the extracted text.
-
-### PDF Documents
-
-For PDF files, the service:
-
-1. Opens the document with PyPDF.
-2. Iterates over its pages.
-3. Extracts available embedded text.
-4. Combines the extracted page text into a result.
-
-**Important:** The current PDF implementation extracts embedded text; it does not render scanned PDF pages into images for OCR. A scanned PDF without an embedded text layer may therefore return little or no text.
-
-OCR accuracy depends on image quality, document layout, scan quality, and the contents of the report.
+Always verify extracted values before using them for clinical or administrative decisions.
 
 ## Database Design
 
 The application uses SQLAlchemy models and PostgreSQL.
 
-### Core Models
+### Core Healthcare Models
 
-The core model file, `app/models.py`, defines:
+The core model file defines healthcare entities such as:
 
-- `User`
-- `Patient`
-- `HealthRecord`
-- `MedicalReport`
-- `RiskPrediction`
+- User
+- Patient
+- HealthRecord
+- MedicalReport
+- RiskPrediction
 
 ### Hospital Management Models
 
-The hospital model file, `app/hms_models.py`, defines entities for:
+The hospital model file defines entities for departments, staff, assignments, appointments, consultations, prescriptions, laboratory workflows, medicines, billing, emergency cases, ICU admissions, operation-theatre cases, housekeeping, and canteen operations.
 
-- Departments
-- Staff profiles
-- Patient-doctor assignments
-- Appointments
-- Consultations
-- Prescriptions
-- Laboratory orders and results
-- Medicines and medicine dispensing
-- Bills and bill items
-- Emergency cases
-- ICU admissions
-- Operation-theatre cases
-- Housekeeping tasks
-- Canteen menu items and orders
-
-### Schema Initialization
-
-The application invokes SQLAlchemy metadata creation and a runtime-schema helper during startup.
-
-The database must be reachable, the configured user must have appropriate permissions, and the database schema must be compatible with the code. For production use, a controlled migration process is preferable to relying only on automatic table creation.
+The application initializes SQLAlchemy metadata and invokes a runtime-schema helper during startup. Production deployments should use a controlled database migration process and appropriate database permissions.
 
 ## Security and Access Control
 
@@ -782,68 +879,119 @@ Security-related functionality includes:
 
 - Use a strong, randomly generated JWT secret.
 - Keep `.env` out of version control.
-- Do not commit database credentials or API keys.
+- Never publish API keys, database credentials, or passwords.
 - Use HTTPS and appropriate infrastructure protections in deployed environments.
-- Apply least-privilege permissions to the PostgreSQL user.
+- Apply least-privilege database permissions.
 - Restrict access to medical documents and uploaded files.
-- Validate user permissions before exposing patient information.
-- Review logs and error responses to avoid disclosing sensitive data.
-- Use synthetic or properly de-identified data for demonstrations and development.
+- Validate authorization before returning patient-specific information.
+- Avoid logging sensitive medical information or credentials.
+- Use synthetic or properly de-identified data for demonstrations.
+- Back up source documents and databases according to the applicable data-protection requirements.
 
 ## Troubleshooting
 
 ### Application reports that `DATABASE_URL` is missing
 
-Check that:
-
-- `.env` exists in the project root.
-- The variable is named `DATABASE_URL`.
-- The value contains a valid PostgreSQL connection URL.
-- The application is started from the correct project directory.
+Check that `.env` exists in the project root and contains a valid `DATABASE_URL`. Start the application from the correct project directory.
 
 ### PostgreSQL connection fails
 
-Verify the database service is running, the host and port are correct, the database exists, and the credentials are valid. Also confirm that the database accepts connections from your environment.
+Verify that PostgreSQL is running, the host and port are correct, the database exists, and the credentials are valid.
+
+### Redis does not respond
+
+Check Docker container status:
+
+```powershell
+docker ps -a
+```
+
+Start the existing container if necessary:
+
+```powershell
+docker start healthcare-redis
+```
+
+Check connectivity:
+
+```powershell
+docker exec healthcare-redis redis-cli ping
+```
+
+The expected response is `PONG`.
+
+### RAG upload is accepted, but indexing does not complete
+
+1. Verify that Redis is reachable.
+2. Start the RQ worker using the documented Windows-compatible command.
+3. Inspect the worker terminal for job execution and errors.
+4. Check the returned job ID and status.
+5. Verify the source file exists in the configured directory.
+6. Confirm that the required document-processing and embedding dependencies are installed.
+7. Inspect the ingestion job result and test retrieval again.
+
+An accepted upload response alone does not confirm successful indexing.
+
+### RQ worker reports an `os.fork` error on Windows
+
+Use the worker command configured for this development environment:
+
+```powershell
+rq worker --worker-class rq.worker.SimpleWorker medical-rag
+```
+
+### The RAG assistant cannot retrieve a document
+
+Check that the document is indexed, the vector-store path is correct, the embedding dependencies are installed, and the source metadata is present. If necessary, run a controlled synchronization and inspect the worker result.
+
+### The scheduled sync is not running
+
+Confirm that the FastAPI application started successfully, Redis was available when the scheduler attempted to enqueue the job, and a worker is listening on the configured queue. Inspect backend and worker logs.
 
 ### Tesseract executable is not found
 
-Install Tesseract OCR and check its executable path. The current OCR service checks `C:\Program Files\Tesseract-OCR\tesseract.exe`; update this setting if your installation uses a different path.
+Install Tesseract OCR and confirm that the configured executable path matches the installation.
 
 ### The ML model is not ready
 
-Check `/prediction/model-status` and confirm that the model file exists. If retraining is needed, ensure PostgreSQL contains enough complete, labelled health records and that the labels are valid.
+Check the model-status endpoint, verify the model file exists, and confirm that sufficient complete labelled records are available for training.
 
 ### AI assistant requests fail
 
-Verify the relevant API key and model identifier in `.env`. Confirm that the provider is accessible and that the selected model is supported by the provider account.
+Verify the configured provider credentials and model identifier. Confirm that the provider is available and that the selected model is supported by the account.
 
 ### Swagger shows authorization or validation errors
 
-Review the endpoint's security requirements and request schema in `/docs`. For protected endpoints, authenticate first and provide the required token using the supported authorization flow.
+Review the endpoint's request schema and authentication requirements in `/docs`. Authenticate before calling protected endpoints and supply the expected request fields.
 
 ## Limitations and Disclaimer
 
-- This repository is a backend application; a frontend application is not included in the listed project structure.
-- OCR results may contain recognition errors and require verification.
-- Machine learning predictions depend on training-data quality, coverage, and model performance.
-- Demo or synthetic labels should not be treated as clinically validated ground truth.
-- Statistical outliers and clustering results are analytical indicators, not diagnoses.
-- Availability of Gemini, Groq, PostgreSQL, and OCR processing depends on correct configuration and service availability.
-- A successful local run does not by itself establish production readiness, regulatory compliance, or clinical validation.
+- This repository is a backend application; a frontend application is not described as part of this backend README.
+- RAG indexing depends on Redis, the RQ worker, document-processing dependencies, and ChromaDB availability.
+- Upload acceptance is not equivalent to indexing completion.
+- Daily reconciliation is attempted according to the configured scheduler interval but is not guaranteed to succeed when dependencies are unavailable.
+- OCR results can contain recognition errors.
+- ML predictions depend on data quality, coverage, and model performance.
+- Clustering and outlier detection are analytical tools, not diagnoses.
+- RAG citations do not independently verify the correctness of generated answers.
+- Medical information may be incomplete or outdated and should be checked against trusted clinical guidance.
+- A successful local run does not establish production readiness, regulatory compliance, data-protection compliance, or clinical validation.
 
-**This system is intended for software development, healthcare data analysis, and decision-support experimentation. It is not a substitute for professional medical judgment, diagnosis, or treatment.**
+**This project is intended for software development, healthcare data analysis, and decision-support experimentation. It is not a substitute for professional medical judgment, diagnosis, or treatment.**
 
 ## Future Improvements
 
-Potential future enhancements include:
+Potential improvements include:
 
 - Automated tests and continuous integration.
-- Database migration management.
-- More robust OCR preprocessing and scanned-PDF handling.
-- Model evaluation on larger, clinically validated datasets.
-- Centralized audit logging and monitoring.
+- More robust RAG indexing and synchronization tests.
+- Better background-job monitoring and retry handling.
+- Controlled database migrations.
+- Improved OCR preprocessing and scanned-document support.
+- Model evaluation using larger, clinically validated datasets.
+- Audit logging and operational monitoring.
 - Deployment hardening, secure file storage, and backup procedures.
-- Expanded observability for ML training and external AI integrations.
+- Improved document-level access control and source validation.
 
 ## Author
 
