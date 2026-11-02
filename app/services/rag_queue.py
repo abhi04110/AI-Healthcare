@@ -1,6 +1,8 @@
 
 """Redis-backed queue helpers for RAG indexing."""
 
+from uuid import uuid4
+
 from redis import Redis
 from redis.exceptions import RedisError
 from rq import Queue
@@ -10,7 +12,11 @@ from app.config import (
     RAG_QUEUE_NAME,
     REDIS_URL,
 )
-from app.services.rag_worker import run_rag_sync
+from app.services.rag_worker import (
+    run_rag_sync,
+    run_rag_index,
+    run_rag_delete,
+)
 
 
 def get_redis_connection() -> Redis:
@@ -23,44 +29,74 @@ def get_redis_connection() -> Redis:
     )
 
 
-def enqueue_rag_sync(reason: str = "manual") -> dict:
-    """Queue a RAG sync job; avoid adding duplicate queued/running sync jobs."""
+def _get_queue() -> Queue:
+    connection = get_redis_connection()
+    connection.ping()
+
+    return Queue(
+        name=RAG_QUEUE_NAME,
+        connection=connection,
+        default_timeout=RAG_JOB_TIMEOUT_SECONDS,
+    )
+
+
+def _enqueue(function, *args, description: str, job_id: str) -> dict:
     try:
-        connection = get_redis_connection()
-        connection.ping()
-
-        queue = Queue(
-            name=RAG_QUEUE_NAME,
-            connection=connection,
-            default_timeout=RAG_JOB_TIMEOUT_SECONDS,
-        )
-
-        job_id = f"medical-rag-sync-{RAG_QUEUE_NAME}"
-
-        existing = queue.fetch_job(job_id)
-        if existing and existing.get_status() in {"queued", "started", "deferred"}:
-            return {
-                "status": "already_queued",
-                "job_id": existing.id,
-                "reason": reason,
-            }
+        queue = _get_queue()
 
         job = queue.enqueue(
-            run_rag_sync,
+            function,
+            *args,
             job_id=job_id,
             job_timeout=RAG_JOB_TIMEOUT_SECONDS,
             result_ttl=86400,
             failure_ttl=604800,
-            description=f"Medical knowledge sync: {reason}",
+            description=description,
         )
 
         return {
             "status": "queued",
             "job_id": job.id,
-            "reason": reason,
+            "description": description,
         }
 
     except RedisError as exc:
         raise RuntimeError(
-            "Redis is unavailable. Start the Redis service and retry."
+            "Redis is unavailable. Start Redis and retry."
         ) from exc
+
+
+def enqueue_rag_index(filename: str) -> dict:
+    """Queue indexing for one uploaded document."""
+    if not filename or not filename.strip():
+        raise ValueError("A document filename is required.")
+
+    return _enqueue(
+        run_rag_index,
+        filename,
+        description=f"Index medical document: {filename}",
+        job_id=f"medical-rag-index-{uuid4().hex}",
+    )
+
+
+def enqueue_rag_delete(filename: str) -> dict:
+    """Queue deletion of one document and its vector chunks."""
+    if not filename or not filename.strip():
+        raise ValueError("A document filename is required.")
+
+    return _enqueue(
+        run_rag_delete,
+        filename,
+        description=f"Delete medical document: {filename}",
+        job_id=f"medical-rag-delete-{uuid4().hex}",
+    )
+
+
+def enqueue_rag_sync(reason: str = "manual") -> dict:
+    """Queue a full medical knowledge synchronization."""
+    return _enqueue(
+        run_rag_sync,
+        reason,
+        description=f"Medical knowledge sync: {reason}",
+        job_id=f"medical-rag-sync-{uuid4().hex}",
+    )

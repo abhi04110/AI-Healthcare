@@ -44,12 +44,13 @@ from app.services.access_service import get_accessible_patient_query
 from app.services.rag_service import (
     format_medical_knowledge_context,
     retrieve_medical_knowledge,
-    ingest_medical_documents,
     list_medical_documents,
-    delete_medical_document,
 )
-from app.services.rag_queue import enqueue_rag_sync
-
+from app.services.rag_queue import (
+    enqueue_rag_sync,
+    enqueue_rag_index,
+    enqueue_rag_delete,
+)
 router = APIRouter(
     prefix="/assistant",
     tags=["AI Healthcare Assistant"]
@@ -505,9 +506,7 @@ async def upload_medical_knowledge_document(
 
     try:
         # Redis/RQ worker will index the uploaded document in the background.
-        queue_result = enqueue_rag_sync(
-            reason=f"upload:{safe_filename}"
-        )
+        queue_result = enqueue_rag_index(safe_filename)
     except Exception as exc:
         raise HTTPException(
             status_code=503,
@@ -547,33 +546,54 @@ def get_medical_knowledge_documents(
     }
 
 
+
 @router.delete("/knowledge")
 def remove_medical_knowledge_document(
-    filename: str = Query(..., min_length=1, description="Exact stored filename or relative path returned by GET /assistant/knowledge"),
+    filename: str = Query(
+        ...,
+        min_length=1,
+        description="Exact stored filename or relative path returned by GET /assistant/knowledge",
+    ),
     current_user: User = Depends(require_admin),
 ):
-    """Delete a stored medical reference document and its indexed vector chunks (admin only)."""
+    """Queue deletion of a medical reference document (admin only)."""
     try:
-        result = delete_medical_document(filename)
+        result = enqueue_rag_delete(filename)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Could not update the medical knowledge index: {type(exc).__name__}: {exc}") from exc
-    if not result.get("deleted"):
-        raise HTTPException(status_code=404, detail="Medical knowledge document was not found")
-    return {"status": "success", **result}
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not queue document deletion: {type(exc).__name__}: {exc}",
+        ) from exc
+
+    return {
+        "status": "accepted",
+        "message": "Medical document deletion has been queued.",
+        "filename": filename,
+        "deletion_job": result,
+    }
 
 
 @router.post("/knowledge/reindex")
 def reindex_medical_knowledge_documents(
     current_user: User = Depends(require_admin),
 ):
-    """Rebuild indexed chunks from the files currently stored in medical_knowledge (admin only)."""
+    """Queue a full medical knowledge reindex (admin only)."""
     try:
-        result = ingest_medical_documents()
+        result = enqueue_rag_sync(reason="manual-reindex")
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Medical knowledge reindex failed: {type(exc).__name__}: {exc}") from exc
-    return result
+        raise HTTPException(
+            status_code=503,
+            detail=f"Medical knowledge reindex could not be queued: {type(exc).__name__}: {exc}",
+        ) from exc
+
+    return {
+        "status": "accepted",
+        "message": "Medical knowledge reindex has been queued.",
+        "indexing_job": result,
+    }
+
 
 
 def extract_patient_id_from_question(question: str) -> int | None:
