@@ -12,6 +12,7 @@ from app.config import (
     RAG_QUEUE_NAME,
     REDIS_URL,
 )
+from app.services.rag_progress import update_rag_job
 from app.services.rag_worker import (
     run_rag_sync,
     run_rag_index,
@@ -44,9 +45,11 @@ def _enqueue(function, *args, description: str, job_id: str) -> dict:
     try:
         queue = _get_queue()
 
+        update_rag_job(job_id, 0, "Queued", "Indexing job is waiting for a worker.", status="queued")
         job = queue.enqueue(
             function,
             *args,
+            job_id,
             job_id=job_id,
             job_timeout=RAG_JOB_TIMEOUT_SECONDS,
             result_ttl=86400,

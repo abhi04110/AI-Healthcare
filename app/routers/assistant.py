@@ -14,6 +14,7 @@ from fastapi import (
     Query,
     status,
 )
+from fastapi.responses import StreamingResponse
 
 from sqlalchemy.orm import Session
 
@@ -51,6 +52,7 @@ from app.services.rag_queue import (
     enqueue_rag_index,
     enqueue_rag_delete,
 )
+from app.services.rag_progress import get_rag_job, stream_rag_job
 router = APIRouter(
     prefix="/assistant",
     tags=["AI Healthcare Assistant"]
@@ -573,6 +575,49 @@ def remove_medical_knowledge_document(
         "filename": filename,
         "deletion_job": result,
     }
+
+
+@router.get("/knowledge/jobs/{job_id}")
+def get_medical_knowledge_job_status(
+    job_id: str,
+    current_user: User = Depends(require_admin),
+):
+    """Get the latest live progress for an admin RAG indexing job."""
+    try:
+        progress = get_rag_job(job_id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not read RAG job progress: {type(exc).__name__}: {exc}",
+        ) from exc
+    if progress is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Progress not found for this job. This may be an older job created before live progress tracking was installed.",
+        )
+    return progress
+
+
+@router.get("/knowledge/jobs/{job_id}/stream")
+def stream_medical_knowledge_job_status(
+    job_id: str,
+    current_user: User = Depends(require_admin),
+):
+    """Stream progress updates as Server-Sent Events (SSE)."""
+    try:
+        progress = get_rag_job(job_id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not read RAG job progress: {type(exc).__name__}: {exc}",
+        ) from exc
+    if progress is None:
+        raise HTTPException(status_code=404, detail="Progress not found for this job ID.")
+    return StreamingResponse(
+        stream_rag_job(job_id),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/knowledge/reindex")

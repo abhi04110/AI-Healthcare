@@ -541,6 +541,7 @@ def _index_file(
     relative_source: str,
     collection,
     model,
+    progress_callback=None,
 ) -> dict[str, Any]:
     source_key = _source_key(relative_source)
     source_hash = _file_hash(path)
@@ -561,6 +562,9 @@ def _index_file(
             "chunks": 0,
         }
 
+    if progress_callback:
+        progress_callback(8, "Extracting document", "Reading document text and running OCR where required.")
+
     chunks_with_pages = []
 
     for page_number, page_text in _read_document(path):
@@ -568,6 +572,9 @@ def _index_file(
             (page_number, chunk)
             for chunk in _split_text(page_text)
         )
+
+    if progress_callback:
+        progress_callback(25, "Chunking text", f"Created {len(chunks_with_pages)} text chunks.")
 
     if not chunks_with_pages:
         _update_document_status(
@@ -613,7 +620,8 @@ def _index_file(
     embedding_batch_size = 32
     storage_batch_size = 100
 
-    for offset in range(0, len(texts), embedding_batch_size):
+    total_batches = max(1, (len(texts) + embedding_batch_size - 1) // embedding_batch_size)
+    for batch_number, offset in enumerate(range(0, len(texts), embedding_batch_size), start=1):
         batch_end = min(
             offset + embedding_batch_size,
             len(texts),
@@ -625,12 +633,23 @@ def _index_file(
             show_progress_bar=False,
         ).tolist()
 
+        if progress_callback:
+            progress = 30 + int((batch_number / total_batches) * 55)
+            progress_callback(
+                progress,
+                "Generating embeddings and storing vectors",
+                f"Processed embedding batch {batch_number} of {total_batches} ({batch_end} of {len(texts)} chunks).",
+            )
+
         collection.upsert(
             ids=ids[offset:batch_end],
             documents=texts[offset:batch_end],
             embeddings=batch_vectors,
             metadatas=metadatas[offset:batch_end],
         )
+
+    if progress_callback:
+        progress_callback(92, "Finalizing vector index", "Cleaning obsolete vectors and updating document status.")
 
     new_id_set = set(ids)
     obsolete_ids = [
@@ -650,6 +669,9 @@ def _index_file(
         len(texts),
     )
 
+    if progress_callback:
+        progress_callback(98, "Finalizing vector index", "Document metadata and index status saved.")
+
     return {
         "source": relative_source,
         "status": "indexed" if existing_hash is None else "updated",
@@ -657,7 +679,7 @@ def _index_file(
     }
 
 
-def ingest_medical_documents() -> dict[str, Any]:
+def ingest_medical_documents(progress_callback=None) -> dict[str, Any]:
     """Incrementally index supported documents and remove stale deleted sources."""
     root = Path(MEDICAL_KNOWLEDGE_DIR).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -678,14 +700,22 @@ def ingest_medical_documents() -> dict[str, Any]:
         relative_source = path.relative_to(root).as_posix()
 
         try:
+            def file_progress(percent, stage, message):
+                if progress_callback:
+                    overall = int(((len(results) + (percent / 100)) / max(1, len(files))) * 90)
+                    progress_callback(overall, stage, f"{relative_source}: {message}")
+
             result = _index_file(
                 path,
                 relative_source,
                 collection,
                 model,
+                progress_callback=file_progress,
             )
 
             results.append(result)
+            if progress_callback:
+                progress_callback(int((len(results) / max(1, len(files))) * 90), "Processing documents", f"Processed {len(results)} of {len(files)} documents.")
 
         except Exception as exc:
             results.append({
@@ -732,6 +762,9 @@ def ingest_medical_documents() -> dict[str, Any]:
     for key in stale_keys:
         deleted_chunks += _delete_source_chunks(collection, key)
 
+    if progress_callback:
+        progress_callback(95, "Cleaning stale vectors", "Removing vectors for documents no longer present.")
+
     failed = sum(
         item["status"] == "error"
         for item in results
@@ -759,7 +792,7 @@ def ingest_medical_documents() -> dict[str, Any]:
         "embedding_model": RAG_EMBEDDING_MODEL,
     }
 
-def index_medical_document(filename: str) -> dict[str, Any]:
+def index_medical_document(filename: str, progress_callback=None) -> dict[str, Any]:
     """Index one uploaded medical document without syncing all files."""
     root = Path(MEDICAL_KNOWLEDGE_DIR).resolve()
     requested = Path(filename)
@@ -788,6 +821,7 @@ def index_medical_document(filename: str) -> dict[str, Any]:
         relative_source,
         collection,
         model,
+        progress_callback=progress_callback,
     )
 
 

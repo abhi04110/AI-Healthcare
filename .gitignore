@@ -1,36 +1,55 @@
+# Environment and secrets (CRITICAL: Never commit real credentials)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python Virtual Environments
 env/
 venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python Bytecode and Cache
 __pycache__/
-*.pyc
-.env
-*.db
-# Database backups
+*.py[cod]
+*$py.class
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Databases and Local Dumps
 *.dump
 *.backup
+*.sqlite3
+*.db
 
-uploads/
+# Local Vector Store and Backup Dumps
+vector_store/
+vector_store_*/
+backup_*/
+rag_code_backup/
+
+# File Uploads (runtime data)
+uploads/*
+!uploads/.gitkeep
+
+# Machine Learning Artifacts
 ml_models/*.joblib
 ml_models/*metadata.json
 
-# Frontend dependencies and build output
+# Frontend Dependencies and Build Outputs
 frontend/node_modules/
 frontend/dist/
 node_modules/
-
-# Python cache
-__pycache__/
-*.py[cod]
-
-# Environment secrets
-.env
-
-# Ignore frontend completely
-/frontend/
 package-lock.json
+*.tsbuildinfo
 
-# Ignore environment and cache
-/env/
-node_modules/
-__pycache__/
-*.py[cod]
-.env
+# Editor and OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
