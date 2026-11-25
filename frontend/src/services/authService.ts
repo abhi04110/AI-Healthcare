@@ -41,6 +41,14 @@ export const authService = {
     return data;
   },
 
+  async updateUserRole(userId: number, role: UserRole): Promise<UserResponse> {
+    const { data } = await api.put<UserResponse>(
+      `/auth/users/${userId}/role`,
+      toFormBody({ role }),
+    );
+    return data;
+  },
+
   async getHealth(): Promise<{ status: string }> {
     const { data } = await api.get<{ status: string }>('/health');
     return data;

@@ -12,11 +12,12 @@ import string
 
 from app.database import get_db
 from app.models import User, Patient
-from app.schemas import UserRegister, UserResponse, TokenResponse
+from app.schemas import AssignableRole, UserRegister, UserResponse, TokenResponse
 from app.services.auth_service import (
     register_user_service,
     login_user_service,
     create_user_by_admin_service,
+    update_user_role_service,
 )
 from app.config import JWT_SECRET_KEY, JWT_ALGORITHM
 
@@ -61,6 +62,7 @@ def require_admin(current_user: User = Depends(get_current_user)):
 def require_staff(current_user: User = Depends(get_current_user)):
     allowed_roles = {
         "admin",
+        "sub_admin",
         "department_admin",
         "doctor",
         "nurse",
@@ -118,12 +120,36 @@ def create_user_by_admin(
     name: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
-    role: str = Form(...),
+    role: AssignableRole = Form(
+        default=AssignableRole.doctor,
+        description="Choose the user role. Dropdown available in Swagger UI.",
+    ),
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    user = UserRegister(name=name, email=email, password=password, role=role)
+    role_str = role.value if hasattr(role, "value") else str(role)
+    user = UserRegister(name=name, email=email, password=password, role=role_str)
     return create_user_by_admin_service(user=user, db=db)
+
+
+@router.put("/users/{user_id}/role", response_model=UserResponse)
+def update_user_role(
+    user_id: int,
+    role: AssignableRole = Form(
+        default=AssignableRole.sub_admin,
+        description="Select the new role (default: sub_admin). Choose from the dropdown options in Swagger UI.",
+    ),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Update a user's role (e.g. promote to sub_admin or demote to staff). Super Admin only."""
+    role_str = role.value if hasattr(role, "value") else str(role)
+    return update_user_role_service(
+        user_id=user_id,
+        new_role=role_str,
+        current_user=current_user,
+        db=db,
+    )
 
 
 @router.get("/me", response_model=UserResponse)

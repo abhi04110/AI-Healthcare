@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Scissors,
   ShieldCheck,
-  Sparkles,
   Users,
   UtensilsCrossed,
 } from 'lucide-react';
@@ -50,6 +49,7 @@ export function AdminDashboard() {
   const { user } = useAuth();
   const { prefs } = usePreferences();
   const isSuperAdmin = user?.role === 'admin';
+  const isSubAdmin = user?.role === 'sub_admin';
   const refetchInterval = prefs.autoRefreshSeconds > 0 ? prefs.autoRefreshSeconds * 1000 : false;
 
   const hmsQuery = useQuery({
@@ -89,6 +89,13 @@ export function AdminDashboard() {
   const canteen = useMemo(() => hmsQuery.data?.canteen ?? {}, [hmsQuery.data]);
   const analytics = analyticsQuery.data?.analytics;
 
+  const CANTEEN_STAGE_COLORS: Record<string, string> = {
+    Pending: '#f59e0b',
+    Preparing: '#0284c7',
+    Ready: '#0d9488',
+    Delivered: '#10b981',
+  };
+
   const riskChartData = useMemo(() => {
     const dist = riskQuery.data?.risk_distribution ?? {};
     return Object.entries(dist).map(([name, value]) => ({
@@ -100,13 +107,40 @@ export function AdminDashboard() {
 
   const canteenChartData = useMemo(
     () => [
-      { stage: 'Pending', count: canteen.pending_orders ?? 0 },
-      { stage: 'Preparing', count: canteen.preparing_orders ?? 0 },
-      { stage: 'Ready', count: canteen.ready_orders ?? 0 },
-      { stage: 'Delivered', count: canteen.delivered_orders ?? 0 },
+      {
+        stage: 'Pending',
+        count: canteen.pending_orders ?? canteen.pending ?? 0,
+        color: CANTEEN_STAGE_COLORS.Pending,
+      },
+      {
+        stage: 'Preparing',
+        count: canteen.preparing_orders ?? canteen.preparing ?? 0,
+        color: CANTEEN_STAGE_COLORS.Preparing,
+      },
+      {
+        stage: 'Ready',
+        count: canteen.ready_orders ?? canteen.ready ?? 0,
+        color: CANTEEN_STAGE_COLORS.Ready,
+      },
+      {
+        stage: 'Delivered',
+        count: canteen.delivered_orders ?? canteen.delivered ?? 0,
+        color: CANTEEN_STAGE_COLORS.Delivered,
+      },
     ],
     [canteen],
   );
+
+  const totalCanteenOrders =
+    canteen.total_orders ??
+    dash.total_canteen_orders ??
+    ((canteen.pending_orders ?? canteen.pending ?? 0) +
+      (canteen.preparing_orders ?? canteen.preparing ?? 0) +
+      (canteen.ready_orders ?? canteen.ready ?? 0) +
+      (canteen.delivered_orders ?? canteen.delivered ?? 0));
+
+  const totalMenuItems = canteen.total_menu_items ?? dash.total_canteen_menu_items ?? 0;
+  const availableMenuItems = canteen.available_menu_items ?? dash.available_canteen_menu_items ?? 0;
 
   const isHidden = (key: string) => prefs.hiddenAdminWidgets.includes(key);
 
@@ -116,10 +150,17 @@ export function AdminDashboard() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-bold text-slate-900">
-              {isSuperAdmin ? 'Hospital-Wide Command Overview' : 'Department Operations Overview'}
+              {isSuperAdmin
+                ? 'Hospital-Wide Command Overview'
+                : isSubAdmin
+                ? 'Hospital Operations Command Overview'
+                : 'Department Operations Overview'}
             </h2>
+            {isSubAdmin && (
+              <Badge variant="purple">Sub-Admin (Operations Command)</Badge>
+            )}
             {hmsQuery.data?.access_scope && (
-              <Badge variant="purple">Scope: {formatLabel(hmsQuery.data.access_scope)}</Badge>
+              <Badge variant="blue">Scope: {formatLabel(hmsQuery.data.access_scope)}</Badge>
             )}
             {isSuperAdmin && dbCheckQuery.data && (
               <Badge variant={dbCheckQuery.data.status === 'ok' ? 'emerald' : 'rose'}>
@@ -129,7 +170,9 @@ export function AdminDashboard() {
             )}
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Live hospital operations, patient care, and analytics overview.
+            {isSubAdmin
+              ? 'Deputy administrative view: Manage patient census, emergency triage, ICU beds, staff directory, and doctor assignments.'
+              : 'Live hospital operations, patient care, and analytics overview.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -140,18 +183,28 @@ export function AdminDashboard() {
               void analyticsQuery.refetch();
               void riskQuery.refetch();
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Refresh Now
           </button>
-          <Link
-            to="/admin/settings"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            Customize Widgets
-          </Link>
+          {isSuperAdmin ? (
+            <Link
+              to="/admin/settings"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition"
+            >
+              <Database className="h-3.5 w-3.5" />
+              System Diagnostics
+            </Link>
+          ) : (
+            <Link
+              to="/admin/operations"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 shadow-sm transition"
+            >
+              <Ambulance className="h-3.5 w-3.5" />
+              Manage Operations
+            </Link>
+          )}
         </div>
       </div>
 
@@ -267,11 +320,11 @@ export function AdminDashboard() {
           <Card>
             <CardHeader
               title="Canteen Order Pipeline & Dietary Activity"
-              subtitle={`Menu items: ${canteen.total_menu_items ?? 0} total (${canteen.available_menu_items ?? 0} available)`}
+              subtitle={`Menu items: ${totalMenuItems} total (${availableMenuItems} available)`}
               action={
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
                   <UtensilsCrossed className="h-3.5 w-3.5" />
-                  Total Orders: {canteen.total_orders ?? 0}
+                  Total Orders: {totalCanteenOrders}
                 </span>
               }
             />
@@ -286,7 +339,11 @@ export function AdminDashboard() {
                       <XAxis dataKey="stage" tick={{ fontSize: 12 }} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
                       <Tooltip />
-                      <Bar dataKey="count" fill="#0284c7" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+                        {canteenChartData.map((entry) => (
+                          <Cell key={entry.stage} fill={entry.color} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -306,7 +363,7 @@ export function AdminDashboard() {
                 </span>
                 <Ambulance className="h-4 w-4 text-rose-600" />
               </div>
-              <p className="text-2xl font-bold text-slate-900">{emergency.total_cases ?? 0}</p>
+              <p className="text-2xl font-bold text-slate-900">{emergency.total_cases ?? dash.total_emergency_cases ?? 0}</p>
               <div className="flex flex-wrap gap-1.5 text-xs">
                 <Badge variant="amber">Waiting: {emergency.waiting ?? 0}</Badge>
                 <Badge variant="rose">Critical: {emergency.critical ?? 0}</Badge>
@@ -322,7 +379,7 @@ export function AdminDashboard() {
                 </span>
                 <BedDouble className="h-4 w-4 text-clinical-600" />
               </div>
-              <p className="text-2xl font-bold text-slate-900">{icu.total_admissions ?? 0}</p>
+              <p className="text-2xl font-bold text-slate-900">{icu.total_admissions ?? dash.total_icu_admissions ?? 0}</p>
               <div className="flex flex-wrap gap-1.5 text-xs">
                 <Badge variant="blue">Occupied: {icu.active_occupied ?? 0}</Badge>
                 <Badge variant="rose">Critical: {icu.critical ?? 0}</Badge>
@@ -338,7 +395,7 @@ export function AdminDashboard() {
                 </span>
                 <Scissors className="h-4 w-4 text-violet-600" />
               </div>
-              <p className="text-2xl font-bold text-slate-900">{ot.total_cases ?? 0}</p>
+              <p className="text-2xl font-bold text-slate-900">{ot.total_cases ?? dash.total_ot_cases ?? 0}</p>
               <div className="flex flex-wrap gap-1.5 text-xs">
                 <Badge variant="blue">Scheduled: {ot.scheduled ?? 0}</Badge>
                 <Badge variant="amber">Active: {ot.in_progress ?? 0}</Badge>
@@ -355,7 +412,7 @@ export function AdminDashboard() {
                 <HeartPulse className="h-4 w-4 text-emerald-600" />
               </div>
               <p className="text-2xl font-bold text-slate-900">
-                {hk.total_tasks ?? 0} <span className="text-sm font-normal text-slate-500">tasks</span>
+                {hk.total_tasks ?? dash.total_housekeeping_tasks ?? 0} <span className="text-sm font-normal text-slate-500">tasks</span>
               </p>
               <div className="flex flex-wrap gap-1.5 text-xs">
                 <Badge variant="amber">Pending: {hk.pending ?? 0}</Badge>
@@ -398,8 +455,14 @@ export function AdminDashboard() {
             to="/admin/ai"
             className="rounded-xl border border-slate-200 p-4 transition hover:border-clinical-300 hover:bg-clinical-50/40"
           >
-            <p className="text-sm font-semibold text-slate-900">ML Risk & RAG Knowledge</p>
-            <p className="mt-1 text-xs text-slate-500">Train classifier, cluster patients, index PDFs.</p>
+            <p className="text-sm font-semibold text-slate-900">
+              {isSubAdmin ? 'Clinical AI & Risk Support' : 'ML Risk & RAG Knowledge'}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {isSubAdmin
+                ? 'Clinical risk scores, patient outliers & AI assistant.'
+                : 'Train classifier, cluster patients, index PDFs.'}
+            </p>
           </Link>
         </CardBody>
       </Card>

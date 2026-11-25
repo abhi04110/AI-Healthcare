@@ -84,6 +84,7 @@ def create_appointment(
 
     allowed_creator_roles = {
         "admin",
+        "sub_admin",
         "department_admin",
         "receptionist"
     }
@@ -137,10 +138,14 @@ def create_appointment(
         patient.id,
         db
     ):
-        raise HTTPException(
-            status_code=400,
-            detail="Doctor is not assigned to this patient"
+        auto_assignment = PatientDoctorAssignment(
+            patient_id=patient.id,
+            doctor_user_id=doctor.id,
+            assigned_by_user_id=current_user.id,
+            is_active=True
         )
+        db.add(auto_assignment)
+        db.flush()
 
     appointment_date = appointment_data.appointment_date
 
@@ -190,7 +195,7 @@ def get_appointments(
     db: Session = Depends(get_db)
 ):
 
-    if current_user.role == "admin":
+    if current_user.role in {"admin", "sub_admin"}:
         appointments = (
             db.query(Appointment)
             .filter(Appointment.is_active == True)
@@ -281,7 +286,7 @@ def get_patient_appointments(
             detail="Patient not found"
         )
 
-    if current_user.role == "admin":
+    if current_user.role in {"admin", "sub_admin"}:
         pass
 
     elif current_user.role == "doctor":
@@ -343,7 +348,7 @@ def get_appointment(
             detail="Appointment not found"
         )
 
-    if current_user.role == "admin":
+    if current_user.role in {"admin", "sub_admin"}:
         return appointment_to_dict(appointment)
 
     if current_user.role == "doctor":
@@ -399,6 +404,7 @@ def update_appointment_status(
 
     allowed_roles = {
         "admin",
+        "sub_admin",
         "doctor",
         "receptionist",
         "department_admin"

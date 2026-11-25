@@ -59,6 +59,10 @@ export const hmsService = {
     const { data } = await api.post('/hms/staff/', toFormBody(payload));
     return data;
   },
+  async deleteStaff(userId: number): Promise<{ message: string; deleted_user_id: number }> {
+    const { data } = await api.delete<{ message: string; deleted_user_id: number }>(`/hms/staff/${userId}`);
+    return data;
+  },
 
   // Assignments
   async listAssignments(): Promise<PatientAssignment[]> {

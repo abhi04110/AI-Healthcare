@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, Link2, Plus, ShieldCheck, UserPlus, Users } from 'lucide-react';
+import { Building2, Link2, Plus, Shield, ShieldAlert, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { hmsService } from '@/services/hmsService';
@@ -32,6 +32,12 @@ export function AdminGovernancePage() {
   const [staffModalOpen, setStaffModalOpen] = useState(false);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [promoteModalOpen, setPromoteModalOpen] = useState(false);
+  const [delegateModalOpen, setDelegateModalOpen] = useState(false);
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+  const [targetStaff, setTargetStaff] = useState<StaffMember | null>(null);
+  const [promoteAction, setPromoteAction] = useState<'promote' | 'demote'>('promote');
+  const [demoteRole, setDemoteRole] = useState<UserRole>('doctor');
 
   const [deptForm, setDeptForm] = useState({ name: '', code: '', description: '' });
   const [staffForm, setStaffForm] = useState({
@@ -54,6 +60,7 @@ export function AdminGovernancePage() {
     role: 'staff' as UserRole,
   });
   const [assignForm, setAssignForm] = useState({ patient_id: '', doctor_user_id: '' });
+  const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
 
   const departmentsQuery = useQuery({
     queryKey: ['hms-departments'],
@@ -78,6 +85,20 @@ export function AdminGovernancePage() {
   const doctors = useMemo(
     () => (staffQuery.data ?? []).filter((s) => s.role === 'doctor'),
     [staffQuery.data],
+  );
+
+  const eligibleSubAdminCandidates = useMemo(
+    () =>
+      (staffQuery.data ?? []).filter(
+        (s) => s.role !== 'admin' && s.role !== 'sub_admin' && s.is_active
+      ),
+    [staffQuery.data]
+  );
+
+  const selectedCandidate = useMemo(
+    () =>
+      (staffQuery.data ?? []).find((s) => String(s.user_id) === selectedStaffId) ?? null,
+    [staffQuery.data, selectedStaffId]
   );
 
   const createDeptMutation = useMutation({
@@ -149,6 +170,50 @@ export function AdminGovernancePage() {
     onError: (err) => toast.error('Assignment failed', extractApiError(err)),
   });
 
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ userId, role }: { userId: number; role: UserRole }) =>
+      authService.updateUserRole(userId, role),
+    onSuccess: (updated) => {
+      toast.success(
+        promoteAction === 'promote'
+          ? `${updated.name} has been promoted to Sub-Admin`
+          : `Sub-Admin role revoked for ${updated.name} (${updated.role})`
+      );
+      setPromoteModalOpen(false);
+      setDelegateModalOpen(false);
+      setTargetStaff(null);
+      setSelectedStaffId('');
+      void queryClient.invalidateQueries({ queryKey: ['hms-staff'] });
+    },
+    onError: (err) => toast.error('Role update failed', extractApiError(err)),
+  });
+
+  const deleteStaffMutation = useMutation({
+    mutationFn: (userId: number) => hmsService.deleteStaff(userId),
+    onSuccess: () => {
+      toast.success('Staff member permanently removed from the hospital system.');
+      setStaffToDelete(null);
+      void queryClient.invalidateQueries({ queryKey: ['hms-staff'] });
+      void queryClient.invalidateQueries({ queryKey: ['staff-workspace'] });
+    },
+    onError: (err) => {
+      toast.error('Failed to delete staff member', extractApiError(err));
+    },
+  });
+
+  const handleOpenPromote = (staff: StaffMember) => {
+    setTargetStaff(staff);
+    setPromoteAction('promote');
+    setPromoteModalOpen(true);
+  };
+
+  const handleOpenDemote = (staff: StaffMember) => {
+    setTargetStaff(staff);
+    setPromoteAction('demote');
+    setDemoteRole('doctor');
+    setPromoteModalOpen(true);
+  };
+
   const deptColumns: ColumnDef<Department>[] = [
     {
       key: 'name',
@@ -169,56 +234,119 @@ export function AdminGovernancePage() {
     { key: 'created', header: 'Created', render: (d) => formatDateTime(d.created_at) },
   ];
 
-  const staffColumns: ColumnDef<StaffMember>[] = [
-    {
-      key: 'member',
-      header: 'Staff Member',
-      render: (s) => (
-        <div>
-          <p className="font-semibold text-slate-900">{s.name}</p>
-          <p className="text-xs text-slate-500">{s.email}</p>
-        </div>
-      ),
-    },
-    {
-      key: 'role',
-      header: 'Role',
-      render: (s) => (
-        <Badge variant={ROLE_METADATA[s.role]?.badgeVariant ?? 'slate'}>
-          {ROLE_METADATA[s.role]?.label ?? s.role}
-        </Badge>
-      ),
-    },
-    {
-      key: 'department',
-      header: 'Department & Code',
-      render: (s) => (
-        <div>
-          <p className="font-medium text-slate-800">{s.department}</p>
-          <p className="text-xs text-slate-500">
-            {s.employee_code} • {s.designation || 'Staff'}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: 'shift',
-      header: 'Shift & Specialty',
-      render: (s) => (
-        <div className="text-xs">
-          <p className="text-slate-700">
-            {s.shift_start || '—'} – {s.shift_end || '—'}
-          </p>
-          <p className="text-slate-500">{s.specialty || s.qualification || '—'}</p>
-        </div>
-      ),
-    },
-    {
-      key: 'active',
-      header: 'Status',
-      render: (s) => <StatusBadge status={s.is_active ? 'active' : 'inactive'} />,
-    },
-  ];
+  const staffColumns: ColumnDef<StaffMember>[] = useMemo(() => {
+    const cols: ColumnDef<StaffMember>[] = [
+      {
+        key: 'member',
+        header: 'Staff Member',
+        render: (s) => (
+          <div>
+            <p className="font-semibold text-slate-900">{s.name}</p>
+            <p className="text-xs text-slate-500">{s.email}</p>
+          </div>
+        ),
+      },
+      {
+        key: 'role',
+        header: 'Role',
+        render: (s) => (
+          <Badge variant={ROLE_METADATA[s.role]?.badgeVariant ?? 'slate'}>
+            {ROLE_METADATA[s.role]?.label ?? s.role}
+          </Badge>
+        ),
+      },
+      {
+        key: 'department',
+        header: 'Department & Code',
+        render: (s) => (
+          <div>
+            <p className="font-medium text-slate-800">{s.department}</p>
+            <p className="text-xs text-slate-500">
+              {s.employee_code} • {s.designation || 'Staff'}
+            </p>
+          </div>
+        ),
+      },
+      {
+        key: 'shift',
+        header: 'Shift & Specialty',
+        render: (s) => (
+          <div className="text-xs">
+            <p className="text-slate-700">
+              {s.shift_start || '—'} – {s.shift_end || '—'}
+            </p>
+            <p className="text-slate-500">{s.specialty || s.qualification || '—'}</p>
+          </div>
+        ),
+      },
+      {
+        key: 'active',
+        header: 'Status',
+        render: (s) => <StatusBadge status={s.is_active ? 'active' : 'inactive'} />,
+      },
+    ];
+
+    if (isSuperAdmin) {
+      cols.push({
+        key: 'sub_admin_actions',
+        header: 'Sub-Admin Delegation',
+        render: (s) => {
+          if (s.role === 'admin') {
+            return (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                Root Super Admin
+              </span>
+            );
+          }
+          if (s.role === 'sub_admin') {
+            return (
+              <button
+                type="button"
+                onClick={() => handleOpenDemote(s)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition shadow-xs"
+              >
+                <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
+                Revoke Sub-Admin
+              </button>
+            );
+          }
+          return (
+            <button
+              type="button"
+              onClick={() => handleOpenPromote(s)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-xs"
+            >
+              <Shield className="h-3.5 w-3.5 text-indigo-600" />
+              Make Sub-Admin
+            </button>
+          );
+        },
+      });
+
+      cols.push({
+        key: 'actions',
+        header: 'Actions',
+        render: (s) => {
+          if (s.role === 'admin') {
+            return <span className="text-xs text-slate-400">—</span>;
+          }
+          return (
+            <button
+              type="button"
+              onClick={() => setStaffToDelete(s)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition shadow-xs"
+              title={`Permanently delete ${s.name}`}
+            >
+              <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+              Delete
+            </button>
+          );
+        },
+      });
+    }
+
+    return cols;
+  }, [isSuperAdmin]);
 
   const assignmentColumns: ColumnDef<PatientAssignment>[] = [
     {
@@ -286,6 +414,19 @@ export function AdminGovernancePage() {
           {isSuperAdmin && (
             <button
               type="button"
+              onClick={() => {
+                setSelectedStaffId('');
+                setDelegateModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 shadow-xs transition"
+            >
+              <Shield className="h-4 w-4 text-indigo-600" />
+              Delegate Sub-Admin
+            </button>
+          )}
+          {isSuperAdmin && (
+            <button
+              type="button"
               onClick={() => setDeptModalOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
@@ -326,7 +467,13 @@ export function AdminGovernancePage() {
         <Card>
           <CardHeader
             title="Hospital Staff Roster"
-            subtitle="Scoped automatically: Super Admin sees all departments; Department Admin sees their own department."
+            subtitle={
+              isSuperAdmin
+                ? 'Hospital-wide personnel roster: Manage staff onboarding, doctor assignments, and Sub-Admin role delegation.'
+                : user?.role === 'sub_admin'
+                ? 'Hospital operations roster: Onboard doctors, nurses, and coordinate doctor-to-patient care assignments.'
+                : 'Department personnel roster: Onboard and manage staff within your assigned department.'
+            }
           />
           <CardBody>
             <DataTable
@@ -784,6 +931,273 @@ export function AdminGovernancePage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={promoteModalOpen}
+        onClose={() => {
+          if (!updateRoleMutation.isPending) {
+            setPromoteModalOpen(false);
+            setTargetStaff(null);
+          }
+        }}
+        title={
+          promoteAction === 'promote'
+            ? 'Promote Staff to Sub-Admin'
+            : 'Revoke Sub-Admin Role'
+        }
+        subtitle={
+          promoteAction === 'promote'
+            ? 'Grant hospital operational administrative privileges to this staff member.'
+            : 'Revert this sub-admin to a regular operational or clinical staff role.'
+        }
+      >
+        {targetStaff && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+              <p className="font-semibold text-slate-900">{targetStaff.name}</p>
+              <p className="text-xs text-slate-500">{targetStaff.email}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-slate-600">Current Role:</span>
+                <Badge variant={ROLE_METADATA[targetStaff.role]?.badgeVariant ?? 'slate'}>
+                  {ROLE_METADATA[targetStaff.role]?.label ?? targetStaff.role}
+                </Badge>
+                <span className="text-slate-400">•</span>
+                <span className="text-slate-600">Dept: {targetStaff.department}</span>
+                <span className="text-slate-400">•</span>
+                <span className="text-slate-600">{targetStaff.employee_code}</span>
+              </div>
+            </div>
+
+            {promoteAction === 'promote' ? (
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3.5 text-xs text-indigo-900 space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-indigo-950">
+                  <Shield className="h-4 w-4 text-indigo-600" />
+                  Delegated Sub-Admin Privileges:
+                </div>
+                <ul className="list-disc pl-5 space-y-1 text-indigo-800">
+                  <li>Full operational dashboard metrics, ward status & census view</li>
+                  <li>Staff onboarding & doctor assignment management</li>
+                  <li>Cross-department patient queue & housekeeping oversight</li>
+                  <li>
+                    <strong className="text-indigo-950">Protected Boundary:</strong> Cannot alter
+                    the Root Super Admin, promote other sub-admins, or inspect system diagnostics.
+                  </li>
+                </ul>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-xs text-amber-900">
+                  <p className="font-semibold text-amber-950">Select Target Role:</p>
+                  <p className="text-amber-800 mt-0.5">
+                    Revoking Sub-Admin rights will assign this user back to a regular staff role.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700">New Staff Role</label>
+                  <select
+                    value={demoteRole}
+                    onChange={(e) => setDemoteRole(e.target.value as UserRole)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                  >
+                    {STAFF_CREATABLE_ROLES.filter((r) => r !== 'sub_admin').map((role) => (
+                      <option key={role} value={role}>
+                        {ROLE_METADATA[role].label} ({role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={updateRoleMutation.isPending}
+                onClick={() => {
+                  setPromoteModalOpen(false);
+                  setTargetStaff(null);
+                }}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={updateRoleMutation.isPending}
+                onClick={() => {
+                  updateRoleMutation.mutate({
+                    userId: targetStaff.user_id,
+                    role: promoteAction === 'promote' ? 'sub_admin' : demoteRole,
+                  });
+                }}
+                className={`rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-60 transition ${
+                  promoteAction === 'promote'
+                    ? 'bg-indigo-600 hover:bg-indigo-700'
+                    : 'bg-amber-600 hover:bg-amber-700'
+                }`}
+              >
+                {updateRoleMutation.isPending
+                  ? 'Updating...'
+                  : promoteAction === 'promote'
+                  ? 'Confirm Promotion to Sub-Admin'
+                  : 'Revoke Sub-Admin & Update Role'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={delegateModalOpen}
+        onClose={() => {
+          if (!updateRoleMutation.isPending) {
+            setDelegateModalOpen(false);
+            setSelectedStaffId('');
+          }
+        }}
+        title="Delegate Sub-Admin Privileges"
+        subtitle="Select an existing hospital staff member from the directory to promote them to Sub-Admin. No email or password entry required."
+        maxWidth="max-w-xl"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Select Staff Member from Hospital Directory
+            </label>
+            <select
+              value={selectedStaffId}
+              onChange={(e) => setSelectedStaffId(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            >
+              <option value="">-- Choose active staff member --</option>
+              {eligibleSubAdminCandidates.map((s) => (
+                <option key={s.user_id} value={s.user_id}>
+                  {s.name} — {ROLE_METADATA[s.role]?.label ?? s.role} ({s.department} • {s.employee_code})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              Only active non-admin personnel are listed. The selected user will retain their existing email, personal password, and ID.
+            </p>
+          </div>
+
+          {selectedCandidate && (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                <p className="font-semibold text-slate-900">{selectedCandidate.name}</p>
+                <p className="text-xs text-slate-500">{selectedCandidate.email}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-slate-600">Current Role:</span>
+                  <Badge variant={ROLE_METADATA[selectedCandidate.role]?.badgeVariant ?? 'slate'}>
+                    {ROLE_METADATA[selectedCandidate.role]?.label ?? selectedCandidate.role}
+                  </Badge>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-slate-600">Dept: {selectedCandidate.department}</span>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-slate-600">{selectedCandidate.designation || 'Staff'}</span>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-slate-600">{selectedCandidate.employee_code}</span>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3.5 text-xs text-indigo-900 space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-indigo-950">
+                  <Shield className="h-4 w-4 text-indigo-600" />
+                  Privileges Unlocked Upon Promotion:
+                </div>
+                <ul className="list-disc pl-5 space-y-1 text-indigo-800">
+                  <li><strong>Existing credentials intact:</strong> {selectedCandidate.name} uses their existing email and personal password.</li>
+                  <li><strong>Hospital Command Center unlocked:</strong> Access operational census, ward statuses, and metrics.</li>
+                  <li><strong>Staff & Care delegation:</strong> Can onboard staff and assign doctors to patients.</li>
+                  <li><strong>Protected:</strong> Cannot alter the Root Super Admin, promote other sub-admins, or access system diagnostics.</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              disabled={updateRoleMutation.isPending}
+              onClick={() => {
+                setDelegateModalOpen(false);
+                setSelectedStaffId('');
+              }}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!selectedCandidate || updateRoleMutation.isPending}
+              onClick={() => {
+                if (!selectedCandidate) return;
+                setPromoteAction('promote');
+                updateRoleMutation.mutate({
+                  userId: selectedCandidate.user_id,
+                  role: 'sub_admin',
+                });
+              }}
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 shadow-sm disabled:opacity-50 transition"
+            >
+              {updateRoleMutation.isPending
+                ? 'Promoting to Sub-Admin...'
+                : 'Confirm Promotion to Sub-Admin'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(staffToDelete)}
+        onClose={() => {
+          if (!deleteStaffMutation.isPending) {
+            setStaffToDelete(null);
+          }
+        }}
+        title="Permanently Delete Staff Member"
+        subtitle="This action is irreversible. All linked staff records, doctor assignments, and chat presence will be cleanly removed."
+        maxWidth="max-w-lg"
+      >
+        {staffToDelete && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-3.5 text-xs text-rose-900">
+              <p className="font-semibold text-rose-950">Confirm Permanent Removal:</p>
+              <p className="mt-1 text-rose-800">
+                You are about to permanently delete <strong>{staffToDelete.name}</strong> ({staffToDelete.email}) with role{' '}
+                <Badge variant={ROLE_METADATA[staffToDelete.role]?.badgeVariant ?? 'slate'}>
+                  {ROLE_METADATA[staffToDelete.role]?.label ?? staffToDelete.role}
+                </Badge>
+                .
+              </p>
+              <ul className="mt-2 list-disc pl-5 space-y-1 text-rose-800">
+                <li>Their staff login credentials and account will be removed immediately.</li>
+                <li>They will be removed from all chat channels, workspaces, and direct messages.</li>
+                <li>Any active patient care assignments will be cleanly unassigned.</li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={deleteStaffMutation.isPending}
+                onClick={() => setStaffToDelete(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteStaffMutation.isPending}
+                onClick={() => deleteStaffMutation.mutate(staffToDelete.user_id)}
+                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-rose-700 disabled:opacity-60 transition"
+              >
+                {deleteStaffMutation.isPending ? 'Deleting...' : 'Yes, Delete Staff Member'}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

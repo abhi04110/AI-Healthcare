@@ -36,7 +36,8 @@ from app.services.patient_service import (
     get_patients_service,
     get_patient_service,
     update_patient_service,
-    delete_patient_service
+    delete_patient_service,
+    create_portal_account_service,
 )
 
 
@@ -59,6 +60,8 @@ def create_patient(
     phone: str | None = Form(None),
     address: str | None = Form(None),
     medical_history: str | None = Form(None),
+    email: str | None = Form(None, description="Optional. Provide email & password to automatically create a patient portal account."),
+    password: str | None = Form(None, description="Optional. Portal password for patient login."),
     current_user: User = Depends(
         get_current_user
     ),
@@ -77,6 +80,25 @@ def create_patient(
 
     return create_patient_service(
         patient_data=patient_data,
+        current_user=current_user,
+        db=db,
+        email=email,
+        password=password
+    )
+
+
+@router.post("/{patient_id}/portal-account")
+def create_portal_account(
+    patient_id: int,
+    email: str = Form(...),
+    password: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return create_portal_account_service(
+        patient_id=patient_id,
+        email=email,
+        password=password,
         current_user=current_user,
         db=db
     )

@@ -5,7 +5,7 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models import User
 from app.hms_models import Department
-from app.routers.auth import require_admin
+from app.routers.auth import require_admin, require_staff
 
 
 router = APIRouter(
@@ -73,7 +73,7 @@ def create_department(
 
 @router.get("/")
 def list_departments(
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_staff),
     db: Session = Depends(get_db)
 ):
     departments = (

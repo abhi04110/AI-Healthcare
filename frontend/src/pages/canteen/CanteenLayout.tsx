@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom';
-import { ClipboardList, LayoutDashboard, Settings, UtensilsCrossed } from 'lucide-react';
+import { ClipboardList, LayoutDashboard, MessageSquare, Settings, UtensilsCrossed } from 'lucide-react';
 import { PortalShell, type NavItem } from '@/components/layout/PortalShell';
 
 const CANTEEN_NAV_ITEMS: NavItem[] = [
@@ -20,6 +20,11 @@ const CANTEEN_NAV_ITEMS: NavItem[] = [
     to: '/canteen/menu',
     icon: UtensilsCrossed,
     roles: ['canteen_manager', 'canteen_worker'],
+  },
+  {
+    label: 'Staff Chat (Live)',
+    to: '/staff/chat',
+    icon: MessageSquare,
   },
   {
     label: 'Kitchen Workflow & Access',

@@ -1,10 +1,21 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_
 
 from app.database import get_db
 from app.models import User
-from app.hms_models import Department, StaffProfile
+from app.hms_models import (
+    Department,
+    StaffProfile,
+    PatientDoctorAssignment,
+    Appointment,
+    EmergencyCase,
+    ICUAdmission,
+    OperationTheatreCase
+)
+from app.chat_models import ChatMessage, ChatReadState
+from app.schemas import StaffRoleEnum
 from app.routers.auth import get_current_user
 from app.utils.security import hash_password
 
@@ -16,6 +27,7 @@ router = APIRouter(
 
 
 STAFF_ROLES = {
+    "sub_admin",
     "department_admin",
     "doctor",
     "nurse",
@@ -30,6 +42,7 @@ STAFF_ROLES = {
 }
 
 DEPARTMENT_ADMIN_CREATABLE_ROLES = STAFF_ROLES - {
+    "sub_admin",
     "department_admin"
 }
 
@@ -75,7 +88,7 @@ def require_staff_management_access(
     current_user: User,
     db: Session
 ):
-    if current_user.role == "admin":
+    if current_user.role in {"admin", "sub_admin"}:
         return None
 
     if current_user.role == "department_admin":
@@ -98,7 +111,10 @@ def create_staff(
     name: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
-    role: str = Form(...),
+    role: StaffRoleEnum = Form(
+        default=StaffRoleEnum.doctor,
+        description="Select staff role (default: doctor). Choose from dropdown in Swagger UI.",
+    ),
     department_id: int = Form(...),
     employee_code: str = Form(...),
     designation: str = Form(...),
@@ -111,7 +127,9 @@ def create_staff(
 ):
     name = name.strip()
     email = email.strip().lower()
-    role = role.strip().lower()
+    role_str = role.value if hasattr(role, "value") else str(role)
+    role_str = role_str.strip().lower()
+    role = role_str
     employee_code = employee_code.strip().upper()
     designation = designation.strip()
 
@@ -155,6 +173,12 @@ def create_staff(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid staff role"
+        )
+
+    if role in {"admin", "sub_admin"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Direct creation of Admin or Sub-Admin is not allowed. Please promote an existing staff member using Sub-Admin role delegation."
         )
 
     admin_profile = require_staff_management_access(
@@ -322,3 +346,116 @@ def list_staff(
         }
         for user, profile, department in staff
     ]
+
+
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_200_OK
+)
+def delete_staff(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin has permission to delete staff members"
+        )
+
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot delete your own active administrator account"
+        )
+
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Staff member not found"
+        )
+
+    if target_user.role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Root Super Admin accounts cannot be deleted"
+        )
+
+    # 1. Clean up StaffProfile
+    db.query(StaffProfile).filter(StaffProfile.user_id == user_id).delete()
+
+    # 2. Clean up assignments
+    db.query(PatientDoctorAssignment).filter(
+        or_(
+            PatientDoctorAssignment.doctor_user_id == user_id,
+            PatientDoctorAssignment.assigned_by_user_id == user_id
+        )
+    ).delete(synchronize_session=False)
+
+    # 3. Clean up appointments
+    db.query(Appointment).filter(
+        or_(
+            Appointment.doctor_user_id == user_id,
+            Appointment.created_by_user_id == user_id
+        )
+    ).delete(synchronize_session=False)
+
+    # 4. Nullify Emergency, ICU, and OT assignments
+    db.query(EmergencyCase).filter(
+        or_(
+            EmergencyCase.assigned_doctor_id == user_id,
+            EmergencyCase.assigned_nurse_id == user_id
+        )
+    ).update(
+        {EmergencyCase.assigned_doctor_id: None, EmergencyCase.assigned_nurse_id: None},
+        synchronize_session=False
+    )
+
+    db.query(ICUAdmission).filter(
+        or_(
+            ICUAdmission.doctor_user_id == user_id,
+            ICUAdmission.nurse_user_id == user_id
+        )
+    ).update(
+        {ICUAdmission.doctor_user_id: None, ICUAdmission.nurse_user_id: None},
+        synchronize_session=False
+    )
+
+    db.query(OperationTheatreCase).filter(
+        or_(
+            OperationTheatreCase.surgeon_user_id == user_id,
+            OperationTheatreCase.assistant_doctor_id == user_id,
+            OperationTheatreCase.nurse_user_id == user_id
+        )
+    ).update(
+        {
+            OperationTheatreCase.surgeon_user_id: None,
+            OperationTheatreCase.assistant_doctor_id: None,
+            OperationTheatreCase.nurse_user_id: None
+        },
+        synchronize_session=False
+    )
+
+    # 5. Clean up chat records
+    db.query(ChatReadState).filter(ChatReadState.user_id == user_id).delete(synchronize_session=False)
+    db.query(ChatMessage).filter(
+        or_(
+            ChatMessage.sender_id == user_id,
+            ChatMessage.recipient_id == user_id
+        )
+    ).delete(synchronize_session=False)
+
+    # 6. Delete user
+    user_name = target_user.name
+    user_email = target_user.email
+    user_role = target_user.role
+
+    db.delete(target_user)
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": f"Staff member '{user_name}' ({user_email}, {user_role}) has been permanently deleted from hospital records and chat.",
+        "user_id": user_id
+    }

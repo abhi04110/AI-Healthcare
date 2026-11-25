@@ -40,7 +40,7 @@ def analytics_summary(
             "status": "success",
             "access_scope": (
                 "All patients"
-                if current_user.role == "admin"
+                if current_user.role in {"admin", "sub_admin"}
                 else "Patients created by current user"
             ),
             "analytics": analytics
@@ -70,7 +70,7 @@ def risk_distribution(
             "status": "success",
             "access_scope": (
                 "All patients"
-                if current_user.role == "admin"
+                if current_user.role in {"admin", "sub_admin"}
                 else "Patients created by current user"
             ),
             "risk_distribution": distribution
@@ -102,7 +102,7 @@ def analytics_outliers(
             "status": "success",
             "access_scope": (
                 "All patients"
-                if current_user.role == "admin"
+                if current_user.role in {"admin", "sub_admin"}
                 else "Patients created by current user"
             ),
             "total_outliers": len(outliers),

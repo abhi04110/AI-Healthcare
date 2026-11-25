@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ToastProvider } from '@/context/ToastContext';
-import { AuthProvider } from '@/context/AuthContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PreferencesProvider } from '@/context/PreferencesContext';
 import { ProtectedRoute, PublicAuthRedirect } from '@/components/auth/ProtectedRoute';
 
@@ -48,6 +48,7 @@ import { PharmacyDashboard } from '@/pages/pharmacy/PharmacyDashboard';
 
 import { ReceptionLayout } from '@/pages/reception/ReceptionLayout';
 import { ReceptionDashboard } from '@/pages/reception/ReceptionDashboard';
+import { ReceptionPatientsPage } from '@/pages/reception/ReceptionPatientsPage';
 import { ReceptionBillingPage } from '@/pages/reception/ReceptionBillingPage';
 
 import { NurseLayout } from '@/pages/nurse/NurseLayout';
@@ -63,6 +64,26 @@ import { PatientAssistantPage } from '@/pages/patient/PatientAssistantPage';
 import { PatientCanteenPage } from '@/pages/patient/PatientCanteenPage';
 import { PatientBillingPage } from '@/pages/patient/PatientBillingPage';
 import { PatientProfilePage } from '@/pages/patient/PatientProfilePage';
+import { PatientChatPage } from '@/pages/patient/PatientChatPage';
+import { StaffChatPage } from '@/pages/chat/StaffChatPage';
+import type { UserRole } from '@/types/api';
+
+const ALL_STAFF_ROLES: UserRole[] = [
+  'admin',
+  'sub_admin',
+  'department_admin',
+  'doctor',
+  'nurse',
+  'receptionist',
+  'canteen_manager',
+  'canteen_worker',
+  'housekeeping_supervisor',
+  'housekeeping_worker',
+  'lab_technician',
+  'pharmacist',
+  'radiology_technician',
+  'staff',
+];
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +94,14 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function ChatRedirect() {
+  const { user } = useAuth();
+  if (user?.role === 'patient') {
+    return <Navigate to="/patient/chat" replace />;
+  }
+  return <Navigate to="/staff/chat" replace />;
+}
 
 export function App() {
   return (
@@ -103,10 +132,10 @@ export function App() {
                 />
                 <Route path="/403" element={<UnauthorizedPage />} />
 
-                {/* Admin & Department Admin Portal */}
+                {/* Admin, Sub-Admin & Department Admin Portal */}
                 <Route
                   path="/admin"
-                  element={<ProtectedRoute allowedRoles={['admin', 'department_admin']} />}
+                  element={<ProtectedRoute allowedRoles={['admin', 'sub_admin', 'department_admin']} />}
                 >
                   <Route element={<AdminLayout />}>
                     <Route index element={<Navigate to="/admin/dashboard" replace />} />
@@ -239,6 +268,7 @@ export function App() {
                   <Route element={<ReceptionLayout />}>
                     <Route index element={<Navigate to="/reception/dashboard" replace />} />
                     <Route path="dashboard" element={<ReceptionDashboard />} />
+                    <Route path="patients" element={<ReceptionPatientsPage />} />
                     <Route path="billing" element={<ReceptionBillingPage />} />
                     <Route path="preferences" element={<Navigate to="/reception/dashboard" replace />} />
                   </Route>
@@ -266,8 +296,20 @@ export function App() {
                     <Route path="canteen" element={<PatientCanteenPage />} />
                     <Route path="billing" element={<PatientBillingPage />} />
                     <Route path="profile" element={<PatientProfilePage />} />
+                    <Route path="chat" element={<PatientChatPage />} />
                   </Route>
                 </Route>
+
+                {/* Hospital Staff Real-time Comms Workspace */}
+                <Route
+                  path="/staff/chat"
+                  element={
+                    <ProtectedRoute allowedRoles={ALL_STAFF_ROLES}>
+                      <StaffChatPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/chat" element={<ChatRedirect />} />
 
                 {/* Fallback */}
                 <Route path="*" element={<NotFoundPage />} />

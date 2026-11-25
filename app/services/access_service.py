@@ -7,7 +7,7 @@ from app.hms_models import PatientDoctorAssignment
 def get_accessible_patient_query(db: Session, current_user: User):
     query = db.query(Patient)
 
-    if current_user.role == "admin":
+    if current_user.role in {"admin", "sub_admin"}:
         return query
 
     if current_user.role == "doctor":

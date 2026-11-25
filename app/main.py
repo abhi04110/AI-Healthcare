@@ -1,15 +1,17 @@
 
+import os
 import asyncio
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.database import engine, Base, ensure_runtime_schema
 from app.config import FRONTEND_URL
-from app import models, hms_models
+from app import models, hms_models, chat_models
 
 from app.services.ml_scheduler import ml_training_scheduler
 from app.services.rag_scheduler import rag_daily_scheduler
@@ -39,6 +41,7 @@ from app.routers import (
     hms_housekeeping,
     hms_canteen,
     hms_dashboard_router,
+    chat,
 )
 
 logger = logging.getLogger(__name__)
@@ -115,6 +118,10 @@ app.include_router(hms_ot.router)
 app.include_router(hms_housekeeping.router)
 app.include_router(hms_canteen.router)
 app.include_router(hms_dashboard_router)
+app.include_router(chat.router)
+
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 @app.get("/")

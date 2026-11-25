@@ -12,10 +12,10 @@ router = APIRouter(prefix="/prediction", tags=["ML Prediction"])
 
 
 def require_clinical_ml_access(current_user: User):
-    if current_user.role not in {"admin", "doctor"}:
+    if current_user.role not in {"admin", "sub_admin", "doctor"}:
         raise HTTPException(
             status_code=403,
-            detail="Only admin or doctor can run clinical risk prediction",
+            detail="Only admin, sub-admin, or doctor can run clinical risk prediction",
         )
     return current_user
 
@@ -52,8 +52,8 @@ def model_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if current_user.role not in {"admin", "sub_admin"}:
+        raise HTTPException(status_code=403, detail="Admin or Sub-Admin access required")
     return {
         "status": "success",
         "model": get_model_status(),

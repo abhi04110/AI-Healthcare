@@ -15,12 +15,14 @@ router = APIRouter(
 
 MENU_CREATE_ROLES = {
     "admin",
+    "sub_admin",
     "department_admin",
     "canteen_manager"
 }
 
 ORDER_CREATE_ROLES = {
     "admin",
+    "sub_admin",
     "doctor",
     "nurse",
     "receptionist",
@@ -29,6 +31,7 @@ ORDER_CREATE_ROLES = {
 
 ORDER_UPDATE_ROLES = {
     "admin",
+    "sub_admin",
     "department_admin",
     "canteen_manager",
     "canteen_worker"
@@ -250,6 +253,7 @@ def get_canteen_orders(
 ):
     management_roles = {
         "admin",
+        "sub_admin",
         "department_admin",
         "canteen_manager",
         "canteen_worker"
@@ -291,13 +295,21 @@ def get_canteen_order(
 
     management_roles = {
         "admin",
+        "sub_admin",
         "department_admin",
         "canteen_manager",
         "canteen_worker"
     }
 
     if current_user.role not in management_roles:
-        if order.ordered_by_user_id != current_user.id:
+        is_order_creator = order.ordered_by_user_id == current_user.id
+        is_patient_owner = False
+        if order.patient_id:
+            pt = db.query(Patient).filter(Patient.id == order.patient_id).first()
+            if pt and pt.user_id == current_user.id:
+                is_patient_owner = True
+
+        if not is_order_creator and not is_patient_owner:
             raise HTTPException(
                 status_code=403,
                 detail="You do not have access to this order"
@@ -393,11 +405,13 @@ def get_patient_canteen_orders(
 ):
     allowed_roles = {
         "admin",
+        "sub_admin",
         "doctor",
         "nurse",
         "receptionist",
         "canteen_manager",
-        "canteen_worker"
+        "canteen_worker",
+        "patient"
     }
 
     if current_user.role not in allowed_roles:
@@ -414,6 +428,12 @@ def get_patient_canteen_orders(
         raise HTTPException(
             status_code=404,
             detail="Patient not found"
+        )
+
+    if current_user.role == "patient" and patient.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only view your own canteen orders"
         )
 
     orders = db.query(CanteenOrder).filter(

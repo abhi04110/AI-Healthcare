@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 
 from pydantic import (
     BaseModel,
@@ -8,11 +9,62 @@ from pydantic import (
 )
 
 
+class AssignableRole(str, Enum):
+    sub_admin = "sub_admin"
+    department_admin = "department_admin"
+    doctor = "doctor"
+    nurse = "nurse"
+    receptionist = "receptionist"
+    canteen_manager = "canteen_manager"
+    canteen_worker = "canteen_worker"
+    housekeeping_supervisor = "housekeeping_supervisor"
+    housekeeping_worker = "housekeeping_worker"
+    lab_technician = "lab_technician"
+    pharmacist = "pharmacist"
+    radiology_technician = "radiology_technician"
+    staff = "staff"
+    patient = "patient"
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            val = value.strip().lower().replace(" ", "_").replace("-", "_")
+            if val == "subadmin":
+                val = "sub_admin"
+            for m in cls:
+                if m.value == val:
+                    return m
+        return None
+
+
+class StaffRoleEnum(str, Enum):
+    department_admin = "department_admin"
+    doctor = "doctor"
+    nurse = "nurse"
+    receptionist = "receptionist"
+    canteen_manager = "canteen_manager"
+    canteen_worker = "canteen_worker"
+    housekeeping_supervisor = "housekeeping_supervisor"
+    housekeeping_worker = "housekeeping_worker"
+    lab_technician = "lab_technician"
+    pharmacist = "pharmacist"
+    radiology_technician = "radiology_technician"
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            val = value.strip().lower().replace(" ", "_").replace("-", "_")
+            for m in cls:
+                if m.value == val:
+                    return m
+        return None
+
+
 class UserRegister(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=100)
-    role: str = Field(default="doctor")
+    role: AssignableRole = Field(default=AssignableRole.doctor)
 
     @field_validator("name")
     @classmethod
@@ -27,31 +79,31 @@ class UserRegister(BaseModel):
     @field_validator("role")
     @classmethod
     def validate_role(cls, value):
-        value = value.strip().lower()
+        if isinstance(value, AssignableRole):
+            val = value.value
+        else:
+            val = str(value).strip().lower().replace(" ", "_").replace("-", "_")
+            if val == "subadmin":
+                val = "sub_admin"
 
-        allowed_roles = {
-            "admin",
-            "department_admin",
-            "doctor",
-            "nurse",
-            "receptionist",
-            "canteen_manager",
-            "canteen_worker",
-            "housekeeping_supervisor",
-            "housekeeping_worker",
-            "lab_technician",
-            "pharmacist",
-            "radiology_technician",
-            "patient",
-            "staff"
-        }
+        if val == "admin":
+            raise ValueError("Admin role cannot be created directly. Existing staff can be promoted to Sub-Admin by Super Admin.")
 
-        if value not in allowed_roles:
+        allowed_roles = {r.value for r in AssignableRole}
+
+        if val not in allowed_roles:
             raise ValueError(
-                "Role must be admin, doctor, or staff"
+                f"Role '{value}' is invalid. Must be one of: {', '.join(sorted(allowed_roles))}"
             )
 
-        return value
+        return val
+
+
+class UserRoleUpdate(BaseModel):
+    role: AssignableRole = Field(
+        default=AssignableRole.sub_admin,
+        description="Select the new role for the user (default: sub_admin). Choose from the dropdown options.",
+    )
 
 
 class TokenResponse(BaseModel):

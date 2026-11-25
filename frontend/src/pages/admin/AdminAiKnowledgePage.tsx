@@ -18,6 +18,7 @@ export function AdminAiKnowledgePage() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const isSuperAdmin = user?.role === 'admin';
+  const isSubAdmin = user?.role === 'sub_admin';
 
   const [manualForm, setManualForm] = useState({
     age: '54',
@@ -115,7 +116,7 @@ export function AdminAiKnowledgePage() {
   const modelStatusQuery = useQuery({
     queryKey: ['ml-model-status'],
     queryFn: () => clinicalAiService.getModelStatus(),
-    enabled: isSuperAdmin,
+    enabled: isSuperAdmin || isSubAdmin,
   });
   const knowledgeQuery = useQuery({
     queryKey: ['rag-knowledge'],
@@ -200,6 +201,37 @@ export function AdminAiKnowledgePage() {
 
   return (
     <div className="space-y-6">
+      {isSubAdmin && (
+        <div className="rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50/90 to-purple-50/60 p-4 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="rounded-xl bg-indigo-600 p-2 text-white shadow-xs">
+                <Brain className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">
+                  Clinical AI Decision Support & Risk Analytics
+                </p>
+                <p className="text-xs text-slate-600">
+                  Sub-Admin access: Run patient health risk assessments, explore clustering analytics, and consult the AI Clinical Assistant.
+                </p>
+              </div>
+            </div>
+            {modelStatusQuery.data && (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <Badge variant={modelStatusQuery.data.model.model_exists ? 'emerald' : 'amber'}>
+                  ML Model: {modelStatusQuery.data.model.model_exists ? 'Active' : 'Standby'}
+                </Badge>
+                <Badge variant="blue">
+                  Accuracy: {modelStatusQuery.data.model.accuracy !== null ? `${(modelStatusQuery.data.model.accuracy * 100).toFixed(1)}%` : 'N/A'}
+                </Badge>
+                <span className="text-xs font-semibold text-slate-500">• Weights & RAG store managed by Super Admin</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {isSuperAdmin && (
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>

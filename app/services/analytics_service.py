@@ -24,13 +24,13 @@ def get_accessible_patient_query(db: Session, current_user):
 
 def get_accessible_health_records_query(db: Session, current_user):
     patient_query = _shared_accessible_patient_query(db, current_user)
-    patient_ids = patient_query.with_entities(Patient.id).subquery()
+    patient_ids = patient_query.with_entities(Patient.id).scalar_subquery()
     return db.query(HealthRecord).filter(HealthRecord.patient_id.in_(patient_ids))
 
 
 def get_accessible_predictions_query(db: Session, current_user):
     patient_query = _shared_accessible_patient_query(db, current_user)
-    patient_ids = patient_query.with_entities(Patient.id).subquery()
+    patient_ids = patient_query.with_entities(Patient.id).scalar_subquery()
     return db.query(RiskPrediction).filter(RiskPrediction.patient_id.in_(patient_ids))
 
 def get_basic_analytics(

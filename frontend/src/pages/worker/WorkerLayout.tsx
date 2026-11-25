@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom';
-import { ClipboardCheck, LayoutDashboard, ScanText } from 'lucide-react';
+import { ClipboardCheck, LayoutDashboard, MessageSquare, ScanText } from 'lucide-react';
 import { PortalShell, type NavItem } from '@/components/layout/PortalShell';
 
 const WORKER_NAV_ITEMS: NavItem[] = [
@@ -8,6 +8,11 @@ const WORKER_NAV_ITEMS: NavItem[] = [
     to: '/worker/dashboard',
     icon: LayoutDashboard,
     roles: ['housekeeping_supervisor', 'staff', 'radiology_technician'],
+  },
+  {
+    label: 'Staff Chat (Live)',
+    to: '/staff/chat',
+    icon: MessageSquare,
   },
   {
     label: 'Housekeeping Tasks',

@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ambulance, CalendarClock, FileText, Plus, UserPlus } from 'lucide-react';
+import { Ambulance, ArrowRight, CalendarClock, FileText, Plus, Stethoscope, UserPlus, Users } from 'lucide-react';
 import { useToast } from '@/context/ToastContext';
 import { usePreferences } from '@/context/PreferencesContext';
 import { hmsService } from '@/services/hmsService';
@@ -17,6 +18,7 @@ import type { Appointment, PatientResponse } from '@/types/api';
 
 export function ReceptionDashboard() {
   const toast = useToast();
+  const navigate = useNavigate();
   const { prefs } = usePreferences();
   const queryClient = useQueryClient();
 
@@ -25,6 +27,7 @@ export function ReceptionDashboard() {
   const [erModal, setErModal] = useState(false);
   const [drawerPatientId, setDrawerPatientId] = useState<number | null>(null);
 
+  const [createWithPortal, setCreateWithPortal] = useState(false);
   const [ptForm, setPtForm] = useState({
     name: '',
     age: '',
@@ -32,6 +35,8 @@ export function ReceptionDashboard() {
     phone: '',
     address: '',
     medical_history: '',
+    email: '',
+    password: '',
   });
   const [apptForm, setApptForm] = useState({
     patient_id: '',
@@ -63,17 +68,32 @@ export function ReceptionDashboard() {
   const createPatientMutation = useMutation({
     mutationFn: () =>
       patientService.createPatient({
-        name: ptForm.name,
+        name: ptForm.name.trim(),
         age: Number(ptForm.age),
         gender: ptForm.gender,
-        phone: ptForm.phone || undefined,
-        address: ptForm.address || undefined,
-        medical_history: ptForm.medical_history || undefined,
+        phone: ptForm.phone.trim() || undefined,
+        address: ptForm.address.trim() || undefined,
+        medical_history: ptForm.medical_history.trim() || undefined,
+        email: createWithPortal && ptForm.email.trim() ? ptForm.email.trim().toLowerCase() : undefined,
+        password: createWithPortal && ptForm.password.trim() ? ptForm.password.trim() : undefined,
       }),
     onSuccess: (created) => {
-      toast.success('Patient registered', `${created.name} (${created.patient_code})`);
+      toast.success(
+        'Patient registered',
+        `${created.name} (${created.patient_code})${createWithPortal ? ' with portal credentials' : ''}`,
+      );
       setPtModal(false);
-      setPtForm({ name: '', age: '', gender: 'Male', phone: '', address: '', medical_history: '' });
+      setCreateWithPortal(false);
+      setPtForm({
+        name: '',
+        age: '',
+        gender: 'Male',
+        phone: '',
+        address: '',
+        medical_history: '',
+        email: '',
+        password: '',
+      });
       void queryClient.invalidateQueries({ queryKey: ['patients'] });
     },
     onError: (err) => toast.error('Registration failed', extractApiError(err)),
@@ -203,7 +223,18 @@ export function ReceptionDashboard() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setPtModal(true)}
+            onClick={() => navigate('/reception/patients')}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 shadow-xs hover:bg-slate-50 transition-colors"
+          >
+            <Users className="h-4 w-4 text-sky-600" />
+            Patient Directory
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCreateWithPortal(false);
+              setPtModal(true);
+            }}
             className="inline-flex items-center gap-1.5 rounded-xl bg-clinical-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-clinical-700"
           >
             <UserPlus className="h-4 w-4" />
@@ -245,6 +276,39 @@ export function ReceptionDashboard() {
       </div>
 
       <Card>
+        <CardHeader
+          title="On-Duty OPD Doctors"
+          subtitle="Real-time shift schedule for quick appointment allocation and triage"
+        />
+        <CardBody>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {(doctorsQuery.data ?? []).map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3"
+              >
+                <div className="rounded-lg bg-sky-100 p-2 text-sky-700">
+                  <Stethoscope className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-900 truncate">Dr. {doc.name}</p>
+                  <p className="text-[11px] text-slate-600 truncate">{doc.department}</p>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    Shift: {doc.shift_start} – {doc.shift_end}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {(doctorsQuery.data ?? []).length === 0 && (
+              <p className="col-span-full text-xs text-slate-500 text-center py-2">
+                No active doctor profiles found.
+              </p>
+            )}
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
         <CardHeader title="Appointments Queue" subtitle="Scheduled visits and front-desk check-in status" />
         <CardBody>
           <DataTable
@@ -263,7 +327,20 @@ export function ReceptionDashboard() {
       </Card>
 
       <Card>
-        <CardHeader title="Registered Intake Patients" subtitle="Patients registered for hospital care" />
+        <CardHeader
+          title="Registered Intake Patients"
+          subtitle="Patients registered for hospital care"
+          action={
+            <button
+              type="button"
+              onClick={() => navigate('/reception/patients')}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-clinical-600 hover:text-clinical-700"
+            >
+              Open Full Directory
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          }
+        />
         <CardBody>
           <DataTable
             data={patientsQuery.data ?? []}
@@ -282,49 +359,110 @@ export function ReceptionDashboard() {
             e.preventDefault();
             createPatientMutation.mutate();
           }}
-          className="grid gap-3 sm:grid-cols-2"
+          className="space-y-4"
         >
-          <input
-            required
-            placeholder="Full Name"
-            value={ptForm.name}
-            onChange={(e) => setPtForm({ ...ptForm, name: e.target.value })}
-            className="sm:col-span-2 rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          />
-          <input
-            type="number"
-            required
-            min={0}
-            max={130}
-            placeholder="Age"
-            value={ptForm.age}
-            onChange={(e) => setPtForm({ ...ptForm, age: e.target.value })}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          />
-          <select
-            value={ptForm.gender}
-            onChange={(e) => setPtForm({ ...ptForm, gender: e.target.value })}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          >
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Other">Other</option>
-          </select>
-          <input
-            placeholder="Phone"
-            value={ptForm.phone}
-            onChange={(e) => setPtForm({ ...ptForm, phone: e.target.value })}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          />
-          <input
-            placeholder="Address"
-            value={ptForm.address}
-            onChange={(e) => setPtForm({ ...ptForm, address: e.target.value })}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          />
-          <div className="sm:col-span-2 flex justify-end gap-2">
-            <button type="submit" className="rounded-xl bg-clinical-600 px-4 py-2 text-xs font-semibold text-white">
-              Register Patient
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              required
+              placeholder="Full Name *"
+              value={ptForm.name}
+              onChange={(e) => setPtForm({ ...ptForm, name: e.target.value })}
+              className="sm:col-span-2 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            />
+            <input
+              type="number"
+              required
+              min={0}
+              max={130}
+              placeholder="Age *"
+              value={ptForm.age}
+              onChange={(e) => setPtForm({ ...ptForm, age: e.target.value })}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            />
+            <select
+              value={ptForm.gender}
+              onChange={(e) => setPtForm({ ...ptForm, gender: e.target.value })}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            >
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+            <input
+              placeholder="Phone Number"
+              value={ptForm.phone}
+              onChange={(e) => setPtForm({ ...ptForm, phone: e.target.value })}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            />
+            <input
+              placeholder="Residential Address"
+              value={ptForm.address}
+              onChange={(e) => setPtForm({ ...ptForm, address: e.target.value })}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            />
+            <textarea
+              rows={2}
+              placeholder="Medical History / Notes (optional)"
+              value={ptForm.medical_history}
+              onChange={(e) => setPtForm({ ...ptForm, medical_history: e.target.value })}
+              className="sm:col-span-2 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-3">
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={createWithPortal}
+                onChange={(e) => setCreateWithPortal(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-clinical-600 focus:ring-clinical-500"
+              />
+              <div>
+                <span className="text-xs font-bold text-slate-900">
+                  Create Online Patient Portal Login
+                </span>
+                <p className="text-[11px] text-slate-500">
+                  Enables patient to log into Patient Portal to view lab reports, e-prescriptions & bills online.
+                </p>
+              </div>
+            </label>
+
+            {createWithPortal && (
+              <div className="grid gap-3 pt-2 sm:grid-cols-2 border-t border-slate-200">
+                <input
+                  type="email"
+                  required={createWithPortal}
+                  placeholder="Portal Login Email *"
+                  value={ptForm.email}
+                  onChange={(e) => setPtForm({ ...ptForm, email: e.target.value })}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                />
+                <input
+                  type="password"
+                  required={createWithPortal}
+                  placeholder="Temporary Password *"
+                  value={ptForm.password}
+                  onChange={(e) => setPtForm({ ...ptForm, password: e.target.value })}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setPtModal(false)}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={createPatientMutation.isPending}
+              className="rounded-xl bg-clinical-600 px-4 py-2 text-xs font-semibold text-white hover:bg-clinical-700 disabled:opacity-50"
+            >
+              {createPatientMutation.isPending ? 'Registering...' : 'Register Patient'}
             </button>
           </div>
         </form>

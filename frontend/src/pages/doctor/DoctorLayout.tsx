@@ -6,6 +6,7 @@ import {
   FilePlus2,
   FlaskConical,
   LayoutDashboard,
+  MessageSquare,
   Users,
   UtensilsCrossed,
 } from 'lucide-react';
@@ -13,6 +14,7 @@ import { PortalShell, type NavItem } from '@/components/layout/PortalShell';
 
 const DOCTOR_NAV_ITEMS: NavItem[] = [
   { label: 'Clinical Overview', to: '/doctor/dashboard', icon: LayoutDashboard },
+  { label: 'Staff Chat (Live)', to: '/staff/chat', icon: MessageSquare },
   { label: 'Appointments & Slots', to: '/doctor/appointments', icon: CalendarClock },
   { label: 'Assigned Patients & EHR', to: '/doctor/patients', icon: Users },
   { label: 'Consultations & Rx', to: '/doctor/consultations', icon: FilePlus2 },

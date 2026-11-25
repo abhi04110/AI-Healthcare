@@ -17,8 +17,18 @@ export const patientService = {
     phone?: string;
     address?: string;
     medical_history?: string;
+    email?: string;
+    password?: string;
   }): Promise<PatientResponse> {
     const { data } = await api.post<PatientResponse>('/patients', toFormBody(payload));
+    return data;
+  },
+
+  async createPortalAccount(
+    patientId: number,
+    payload: { email: string; password: string },
+  ): Promise<{ status: string; message: string; patient_id: number; user_id: number; email: string }> {
+    const { data } = await api.post(`/patients/${patientId}/portal-account`, toFormBody(payload));
     return data;
   },
 

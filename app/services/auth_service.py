@@ -7,7 +7,7 @@ from app.utils.security import hash_password, verify_password, create_access_tok
 
 PUBLIC_ROLES = {"patient"}
 CORE_ROLES = {
-    "admin",
+    "sub_admin",
     "department_admin",
     "doctor",
     "nurse",
@@ -33,6 +33,12 @@ def create_user_service(user: UserRegister, db: Session, allow_admin: bool = Fal
         )
 
     role = user.role.strip().lower()
+    if role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admin role cannot be created directly. Existing staff can be promoted to Sub-Admin by Super Admin.",
+        )
+
     allowed_roles = CORE_ROLES if allow_admin else PUBLIC_ROLES
     if role not in allowed_roles:
         raise HTTPException(
@@ -62,6 +68,58 @@ def register_user_service(user: UserRegister, db: Session):
 
 def create_user_by_admin_service(user: UserRegister, db: Session):
     return create_user_service(user=user, db=db, allow_admin=True)
+
+
+def update_user_role_service(user_id: int, new_role: str, current_user: User, db: Session):
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admin can update user roles",
+        )
+
+    if hasattr(new_role, "value"):
+        new_role = new_role.value
+
+    # Normalize role: handles "sub admin", "sub-admin", "Sub Admin", "subadmin", "sub_admin"
+    normalized_role = str(new_role).strip().lower().replace(" ", "_").replace("-", "_")
+    if normalized_role == "subadmin":
+        normalized_role = "sub_admin"
+
+    if normalized_role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot promote to Super Admin. Only Sub-Admin or staff roles can be assigned.",
+        )
+
+    if normalized_role not in CORE_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role '{new_role}'. Allowed roles are: {', '.join(sorted(CORE_ROLES))}",
+        )
+
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    if target_user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Super Admin cannot alter their own root role",
+        )
+
+    if target_user.role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super Admin account cannot be modified",
+        )
+
+    target_user.role = normalized_role
+    db.commit()
+    db.refresh(target_user)
+    return target_user
 
 
 def login_user_service(email: str, password: str, db: Session):

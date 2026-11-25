@@ -53,10 +53,10 @@ def assign_patient_to_doctor(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if current_user.role not in {"admin", "department_admin"}:
+    if current_user.role not in {"admin", "sub_admin", "department_admin", "receptionist"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Super Admin or Department Admin can assign patients"
+            detail="Only Super Admin, Sub-Admin, Department Admin, or Receptionist can assign patients"
         )
 
     patient = (
@@ -174,7 +174,7 @@ def list_assignments(
         )
     )
 
-    if current_user.role == "admin":
+    if current_user.role in {"admin", "sub_admin", "receptionist"}:
         pass
 
     elif current_user.role == "department_admin":

@@ -20,6 +20,15 @@ export const ROLE_METADATA: Record<UserRole, RoleMetadata> = {
     badgeVariant: 'purple',
     description: 'Full hospital operations, staff governance, ML lifecycle & RAG knowledge control.',
   },
+  sub_admin: {
+    role: 'sub_admin',
+    label: 'Sub-Admin',
+    portalName: 'Hospital Operations Command (Sub-Admin)',
+    homePath: '/admin/dashboard',
+    accentClass: 'from-slate-800 to-indigo-900',
+    badgeVariant: 'purple',
+    description: 'Hospital operations command, staff onboarding, doctor assignments & live patient care oversight.',
+  },
   department_admin: {
     role: 'department_admin',
     label: 'Department Admin',
@@ -160,7 +169,6 @@ export const STAFF_CREATABLE_ROLES: UserRole[] = [
 ];
 
 export const ALL_USER_ROLES: UserRole[] = [
-  'admin',
   ...STAFF_CREATABLE_ROLES,
   'staff',
   'patient',
@@ -172,19 +180,29 @@ export const ROLE_CAPABILITY_MATRIX: Array<{
   notes: string;
 }> = [
   {
+    module: 'Sub-Admin Role Delegation',
+    roles: ['admin (Super Admin only)'],
+    notes: 'Promote existing staff to Sub-Admin or revoke privileges. Direct admin creation is strictly disabled.',
+  },
+  {
     module: 'Departments & DB Diagnostics',
     roles: ['admin'],
     notes: 'Create/list departments, inspect database health & schema tables.',
   },
   {
     module: 'Staff Onboarding & Assignments',
-    roles: ['admin', 'department_admin'],
-    notes: 'Department Admins are scoped to their own department.',
+    roles: ['admin', 'sub_admin', 'department_admin'],
+    notes: 'Super Admin has global scope; Sub-Admin assists operations; Department Admins are department-scoped.',
   },
   {
     module: 'Patients, Vitals & Report Scanning',
-    roles: ['admin', 'doctor (assigned)', 'patient (self)', 'staff creators (own)'],
-    notes: 'Access is strictly limited to assigned doctors, record creators, and the patient themselves.',
+    roles: ['admin', 'sub_admin', 'receptionist (intake & directory)', 'doctor (assigned)', 'patient (self)', 'staff creators (own)'],
+    notes: 'Receptionists manage hospital intake & register walk-ins with optional portal logins. Clinical vitals and prescriptions remain assigned-doctor protected.',
+  },
+  {
+    module: 'Appointments & Doctor Assignment',
+    roles: ['admin', 'sub_admin', 'receptionist', 'department_admin', 'doctor (own schedule)'],
+    notes: 'Receptionist schedules appointments, manages queue check-ins, and auto-assigns attending OPD doctors to walk-in patients.',
   },
   {
     module: 'Consultations & E-Prescriptions',
@@ -213,7 +231,7 @@ export const ROLE_CAPABILITY_MATRIX: Array<{
   },
   {
     module: 'Housekeeping Tasks',
-    roles: ['admin', 'department_admin', 'housekeeping_supervisor', 'housekeeping_worker (assigned)'],
+    roles: ['admin', 'sub_admin', 'department_admin', 'housekeeping_supervisor', 'housekeeping_worker (assigned)'],
     notes: 'Completed tasks cannot revert to pending/assigned.',
   },
   {

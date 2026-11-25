@@ -6,6 +6,7 @@ import {
   FileHeart,
   FlaskConical,
   LayoutDashboard,
+  MessageSquare,
   Pill,
   UserCog,
   UtensilsCrossed,
@@ -14,6 +15,7 @@ import { PortalShell, type NavItem } from '@/components/layout/PortalShell';
 
 const PATIENT_NAV_ITEMS: NavItem[] = [
   { label: 'My Care Summary', to: '/patient/dashboard', icon: LayoutDashboard },
+  { label: 'Care Team Chat', to: '/patient/chat', icon: MessageSquare },
   { label: 'Book & Track Visits', to: '/patient/appointments', icon: CalendarClock },
   { label: 'Health Records & Reports', to: '/patient/records', icon: FileHeart },
   { label: 'Prescriptions', to: '/patient/prescriptions', icon: Pill },
